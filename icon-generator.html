@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Générateur d'icône</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #111;
+        }
+        canvas {
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="iconCanvas" width="512" height="512"></canvas>
+    
+    <script>
+        const canvas = document.getElementById('iconCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Couleurs de Call of Duty MW
+        const backgroundColor = '#0a0a0a';
+        const borderColor = '#444444';
+        const textColor = '#d4af37';  // Or militaire
+        
+        // Fond
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Bordure militaire
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 20;
+        ctx.strokeRect(30, 30, 512-60, 512-60);
+        
+        // Texte "CA"
+        ctx.fillStyle = textColor;
+        ctx.font = 'bold 200px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('CA', 256, 256);
+
+        // Exportation
+        console.log("Clic droit sur l'icône et 'Enregistrer l'image sous...' pour chaque taille requise");
+    </script>
+</body>
+</html> 
