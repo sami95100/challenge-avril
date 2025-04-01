@@ -52,21 +52,38 @@ let appState = {
     dailyInputs: {},
     completedObjectives: [],
     unlockedBadges: [],
-    history: {}
+    history: {},
+    objectiveStreaks: {},
+    lastMissedDay: {}
 };
 
-// Éléments DOM principaux
+// Éléments DOM
 const elements = {
+    // Onglets et conteneurs principaux
+    dailyTab: document.getElementById('daily-tab'),
+    progressTab: document.getElementById('progress-tab'),
+    statsTab: document.getElementById('stats-tab'),
+    
+    // Boutons d'onglets
+    tabDaily: document.getElementById('tab-daily'),
+    tabProgress: document.getElementById('tab-progress'),
+    tabStats: document.getElementById('tab-stats'),
+    
+    // Conteneurs pour les entrées et les objectifs
+    dailyInputs: document.getElementById('daily-inputs'),
+    progressContainer: document.getElementById('progress-container'),
+    statsContainer: document.getElementById('stats-container'),
+    
+    // Boutons de catégorie
+    categoryBtnPersonal: document.getElementById('category-btn-personal'),
+    categoryBtnProfessional: document.getElementById('category-btn-professional'),
+    
+    // Autres éléments
+    saveButton: document.createElement('button'),
     currentDate: document.getElementById('current-date'),
     currentLevel: document.getElementById('current-level'),
     xpCount: document.getElementById('xp-count'),
     xpProgress: document.getElementById('xp-progress'),
-    dailyInputs: document.getElementById('daily-inputs'),
-    progressContainer: document.getElementById('progress-container'),
-    saveButton: document.getElementById('save-progress'),
-    tabButtons: document.querySelectorAll('.tab-btn'),
-    tabContents: document.querySelectorAll('.tab-content'),
-    categoryButtons: document.querySelectorAll('.category-btn'),
     currentStreak: document.getElementById('current-streak'),
     bestStreak: document.getElementById('best-streak'),
     objectivesCompleted: document.getElementById('objectives-completed'),
@@ -124,23 +141,29 @@ function addXp(amount) {
 }
 
 function calculateCompletionPercentage() {
+    let totalTargets = 0;
     let totalProgress = 0;
-    let totalTarget = 0;
     
+    // Parcourir toutes les catégories d'objectifs
     for (const category in objectives) {
         objectives[category].forEach(objective => {
-            if (!objective.isDaily) {
-                const progressValue = objective.isReverse 
-                    ? Math.min(objective.current, objective.target) 
-                    : objective.current;
-                
-                totalProgress += progressValue;
-                totalTarget += objective.target;
+            if (objective.isDaily) return; // Ignorer les objectifs quotidiens
+            
+            totalTargets += objective.target;
+            
+            // Limiter la progression à la cible (pas plus de 100%)
+            if (objective.current >= objective.target) {
+                totalProgress += objective.target;
+            } else {
+                totalProgress += objective.current;
             }
         });
     }
     
-    return totalTarget > 0 ? Math.floor((totalProgress / totalTarget) * 100) : 0;
+    if (totalTargets === 0) return 0;
+    
+    const completionPercent = Math.min(Math.round((totalProgress / totalTargets) * 100), 100);
+    return completionPercent;
 }
 
 function checkForNewBadges() {
@@ -217,109 +240,233 @@ function updateUIState() {
 
 // Rendu de l'interface utilisateur
 function renderDailyInputs() {
+    console.log("Rendu des inputs quotidiens");
     elements.dailyInputs.innerHTML = '';
     
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = appState.dailyInputs[today] || {};
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const todayData = appState.history[todayStr] || {};
     
-    // Générer les champs de saisie pour les objectifs personnels
-    const personalGroup = document.createElement('div');
-    personalGroup.className = 'daily-input-group';
-    personalGroup.innerHTML = '<h3>Objectifs Personnels</h3>';
+    // Calculer la date d'hier
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayData = appState.history[yesterdayStr] || {};
     
-    objectives.personal.forEach(objective => {
-        const inputValue = todayData[objective.id] || 0;
+    // Ajouter un sélecteur de date (aujourd'hui/hier)
+    const dateSelector = document.createElement('div');
+    dateSelector.className = 'date-selector';
+    dateSelector.innerHTML = `
+        <button id="today-btn" class="date-btn active">Aujourd'hui (${formatDate(today)})</button>
+        <button id="yesterday-btn" class="date-btn">Hier (${formatDate(yesterday)})</button>
+    `;
+    elements.dailyInputs.appendChild(dateSelector);
+    
+    // Conteneur pour les inputs selon la date
+    const inputsContainer = document.createElement('div');
+    inputsContainer.id = 'date-inputs-container';
+    inputsContainer.className = 'date-inputs-container';
+    elements.dailyInputs.appendChild(inputsContainer);
+    
+    // Fonction pour rendre les inputs d'une journée spécifique
+    function renderDateInputs(dateStr, dateData, dateTitle) {
+        inputsContainer.innerHTML = '';
+        elements.currentDate.textContent = dateTitle;
         
-        const inputItem = document.createElement('div');
-        inputItem.className = 'input-header';
-        inputItem.innerHTML = `
-            <div class="objective-title">${objective.title}</div>
-            <div class="input-container">
-                <input type="number" id="input-${objective.id}" value="${inputValue}" min="0" step="1">
-                <span>${objective.unit}</span>
-            </div>
-        `;
+        // Parcourir les catégories d'objectifs
+        for (const category in objectives) {
+            const categoryTitle = category === 'personal' ? 'Objectifs Personnels' : 'Objectifs Professionnels';
+            
+            const categorySection = document.createElement('div');
+            categorySection.className = 'objective-category';
+            categorySection.innerHTML = `<h3>${categoryTitle}</h3>`;
+            
+            // Parcourir les objectifs de cette catégorie
+            objectives[category].forEach(objective => {
+                const inputWrapper = document.createElement('div');
+                inputWrapper.className = 'input-wrapper';
+                
+                // Récupérer la valeur déjà saisie pour cette date (si elle existe)
+                const currentValue = dateData[objective.id] || '';
+                
+                const inputHTML = `
+                    <div class="input-header">
+                        <label for="${objective.id}-input">${objective.title}</label>
+                    </div>
+                    <div class="input-container">
+                        <input 
+                            type="number" 
+                            id="${objective.id}-input" 
+                            min="0" 
+                            step="1" 
+                            placeholder="0"
+                            value="${currentValue}"
+                            data-date="${dateStr}"
+                        >
+                        <span class="unit">${objective.unit}</span>
+                    </div>
+                `;
+                
+                inputWrapper.innerHTML = inputHTML;
+                categorySection.appendChild(inputWrapper);
+            });
+            
+            inputsContainer.appendChild(categorySection);
+        }
         
-        personalGroup.appendChild(inputItem);
+        // Ajouter un seul bouton de sauvegarde pour cette journée
+        const saveButton = document.createElement('button');
+        saveButton.className = 'action-btn save-progress-btn';
+        saveButton.textContent = `SAUVEGARDER (${dateTitle})`;
+        saveButton.setAttribute('data-date', dateStr);
+        saveButton.addEventListener('click', () => saveProgress(dateStr));
+        
+        inputsContainer.appendChild(saveButton);
+    }
+    
+    // Afficher par défaut aujourd'hui
+    renderDateInputs(todayStr, todayData, formatDate(today));
+    
+    // Événements pour les boutons de sélection de date
+    document.getElementById('today-btn').addEventListener('click', (e) => {
+        document.querySelectorAll('.date-btn').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+        renderDateInputs(todayStr, todayData, formatDate(today));
     });
     
-    // Générer les champs de saisie pour les objectifs professionnels
-    const professionalGroup = document.createElement('div');
-    professionalGroup.className = 'daily-input-group';
-    professionalGroup.innerHTML = '<h3>Objectifs Professionnels</h3>';
-    
-    objectives.professional.forEach(objective => {
-        const inputValue = todayData[objective.id] || 0;
-        
-        const inputItem = document.createElement('div');
-        inputItem.className = 'input-header';
-        inputItem.innerHTML = `
-            <div class="objective-title">${objective.title}</div>
-            <div class="input-container">
-                <input type="number" id="input-${objective.id}" value="${inputValue}" min="0" step="1">
-                <span>${objective.unit}</span>
-            </div>
-        `;
-        
-        professionalGroup.appendChild(inputItem);
+    document.getElementById('yesterday-btn').addEventListener('click', (e) => {
+        document.querySelectorAll('.date-btn').forEach(btn => btn.classList.remove('active'));
+        e.target.classList.add('active');
+        renderDateInputs(yesterdayStr, yesterdayData, formatDate(yesterday));
     });
     
-    elements.dailyInputs.appendChild(personalGroup);
-    elements.dailyInputs.appendChild(professionalGroup);
+    console.log("Inputs quotidiens rendus");
 }
 
 function renderProgressView() {
+    console.log("Rendu de la vue de progression");
     elements.progressContainer.innerHTML = '';
     
-    // Déterminer quelle catégorie est active
-    const activeCategory = document.querySelector('.category-btn.active').dataset.category;
+    // Ajouter un titre global avec le pourcentage de progression
+    const completionPercent = calculateCompletionPercentage();
+    const globalProgressHeader = document.createElement('div');
+    globalProgressHeader.className = 'global-progress-header';
+    globalProgressHeader.innerHTML = `
+        <h3>Progression Globale</h3>
+        <div class="global-percent">${completionPercent}%</div>
+    `;
+    elements.progressContainer.appendChild(globalProgressHeader);
     
-    objectives[activeCategory].forEach(objective => {
-        const progressPercent = Math.min(Math.floor((objective.current / objective.target) * 100), 100);
-        const isComplete = objective.current >= objective.target;
-        
-        const objectiveItem = document.createElement('div');
-        objectiveItem.className = `objective-item ${isComplete ? 'completed' : ''}`;
-        
-        objectiveItem.innerHTML = `
-            <div class="objective-header">
-                <div class="objective-title">${objective.title}</div>
-                <div class="objective-progress">${objective.current} / ${objective.target} ${objective.unit}</div>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-value" style="width: ${progressPercent}%; background-color: ${getProgressColor(progressPercent)};"></div>
-            </div>
-        `;
-        
-        elements.progressContainer.appendChild(objectiveItem);
-    });
+    // Ajouter une barre de progression globale
+    const globalProgressBar = document.createElement('div');
+    globalProgressBar.className = 'progress-bar global-progress-bar';
+    globalProgressBar.innerHTML = `
+        <div class="progress-value" style="width: ${completionPercent}%; background-color: ${getProgressColor(completionPercent)};"></div>
+    `;
+    elements.progressContainer.appendChild(globalProgressBar);
+    
+    // Ajouter un séparateur
+    const separator = document.createElement('div');
+    separator.className = 'separator';
+    elements.progressContainer.appendChild(separator);
+    
+    // Déterminer quelle catégorie est active
+    const activeCategoryElement = document.querySelector('.category-btn.active');
+    const activeCategory = activeCategoryElement ? activeCategoryElement.getAttribute('data-category') : 'personal';
+    
+    // Si aucune catégorie n'est active, activer "personal" par défaut
+    if (!activeCategoryElement) {
+        const personalBtn = document.querySelector('.category-btn[data-category="personal"]');
+        if (personalBtn) {
+            personalBtn.classList.add('active');
+        }
+    }
+    
+    // Filtrer les objectifs par catégorie active
+    if (objectives[activeCategory]) {
+        objectives[activeCategory].forEach(objective => {
+            if (objective.isDaily) return; // Ignorer les objectifs quotidiens
+            
+            // Calculer le pourcentage de progression, forcer à 100% si current >= target
+            let progressPercent = 0;
+            if (objective.current >= objective.target) {
+                progressPercent = 100;
+            } else {
+                progressPercent = Math.round((objective.current / objective.target) * 100);
+            }
+            
+            // Forcer l'affichage de la barre à 100% si la cible est atteinte
+            const barWidth = objective.current >= objective.target ? "100%" : `${progressPercent}%`;
+            
+            const objectiveElement = document.createElement('div');
+            objectiveElement.className = 'objective-progress';
+            objectiveElement.innerHTML = `
+                <div class="objective-info">
+                    <span class="objective-title">${objective.title}</span>
+                    <div class="objective-value-container">
+                        <span class="objective-value">${objective.current}/${objective.target} ${objective.unit}</span>
+                        <span class="progress-percent">${progressPercent}%</span>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-value" style="width: ${barWidth}; background-color: ${getProgressColor(progressPercent, objective.isReverse)};"></div>
+                </div>
+            `;
+            
+            elements.progressContainer.appendChild(objectiveElement);
+        });
+    } else {
+        elements.progressContainer.innerHTML = '<p>Aucun objectif trouvé pour cette catégorie.</p>';
+    }
 }
 
-function getProgressColor(percent) {
-    if (percent < 25) return 'var(--danger-color)';
-    if (percent < 50) return '#f39c12';
-    if (percent < 75) return '#3498db';
-    return 'var(--secondary-color)';
+// Fonction pour obtenir la couleur de la barre de progression
+function getProgressColor(percent, isReverse = false) {
+    if (isReverse) {
+        // Pour les objectifs où moins c'est mieux
+        if (percent >= 90) return '#ff4d4d'; // Rouge
+        if (percent >= 70) return '#ff9933'; // Orange
+        return '#4caf50'; // Vert
+    } else {
+        // Pour les objectifs normaux
+        if (percent >= 90) return '#4caf50'; // Vert
+        if (percent >= 70) return '#ff9933'; // Orange
+        return '#ff4d4d'; // Rouge
+    }
 }
 
 function renderBadges() {
+    console.log("Rendu des badges");
+    if (!elements.badgesContainer) {
+        console.error("Container de badges non trouvé");
+        return;
+    }
+    
     elements.badgesContainer.innerHTML = '';
+    
+    // Si aucun badge n'est débloqué, afficher au moins le badge premier jour
+    if (!appState.unlockedBadges || appState.unlockedBadges.length === 0) {
+        appState.unlockedBadges = ['firstDay'];
+        console.log("Badge 'Premier jour' ajouté par défaut");
+    }
     
     badges.forEach(badge => {
         const isUnlocked = appState.unlockedBadges.includes(badge.id);
         
         const badgeElement = document.createElement('div');
-        badgeElement.className = `badge ${isUnlocked ? 'badge-unlocked' : 'badge-locked'}`;
+        badgeElement.className = `badge-item ${isUnlocked ? 'badge-unlocked' : 'badge-locked'}`;
+        
         badgeElement.innerHTML = `
             <div class="badge-icon">${badge.icon}</div>
-            <div class="badge-title">${badge.title}</div>
+            <div class="badge-info">
+                <div class="badge-title">${badge.title}</div>
+                <div class="badge-description">${badge.description}</div>
+            </div>
         `;
-        
-        // Ajouter une info-bulle pour la description
-        badgeElement.title = badge.description;
         
         elements.badgesContainer.appendChild(badgeElement);
     });
+    console.log(`${elements.badgesContainer.childElementCount} badges rendus`);
 }
 
 // Gestionnaires d'événements
@@ -357,109 +504,206 @@ function setupEventListeners() {
     });
 }
 
-function saveProgress() {
-    const today = new Date().toISOString().split('T')[0];
-    appState.dailyInputs[today] = {};
+function saveProgress(dateStr) {
+    // Si aucune date n'est spécifiée, utiliser la date d'aujourd'hui
+    if (!dateStr) {
+        dateStr = new Date().toISOString().split('T')[0];
+    }
     
+    console.log(`Sauvegarde des progrès pour la date: ${dateStr}`);
+    
+    if (!appState.history) {
+        appState.history = {};
+    }
+    
+    if (!appState.history[dateStr]) {
+        appState.history[dateStr] = {};
+        
+        // Incrémenter le nombre de jours actifs uniquement si c'est une nouvelle journée
+        appState.daysActive++;
+    }
+    
+    // Collecter les valeurs d'entrée et mettre à jour les objectifs
     let totalXpEarned = 0;
     
-    // Récupérer toutes les valeurs des champs de saisie
     for (const category in objectives) {
         objectives[category].forEach(objective => {
-            const inputElement = document.getElementById(`input-${objective.id}`);
-            const inputValue = parseInt(inputElement.value, 10) || 0;
-            
-            // Enregistrer la valeur d'entrée pour aujourd'hui
-            appState.dailyInputs[today][objective.id] = inputValue;
-            
-            // Calculer l'XP gagnée aujourd'hui (différence entre la valeur précédente)
-            const previousDayValue = getPreviousDayValue(objective.id);
-            const dailyProgress = inputValue - previousDayValue;
-            
-            if (dailyProgress > 0) {
-                const xpEarned = dailyProgress * objective.xpPerUnit;
-                totalXpEarned += xpEarned;
+            // Sélectionner les inputs avec la date spécifiée
+            const inputElement = document.querySelector(`#${objective.id}-input[data-date="${dateStr}"]`);
+            if (!inputElement) {
+                console.log(`Input pour ${objective.id} non trouvé pour la date ${dateStr}`);
+                return;
             }
             
-            // Mettre à jour la valeur totale
-            if (objective.isDaily) {
-                objective.current += inputValue > 0 ? 1 : 0; // Compter comme un jour fait si la valeur est > 0
-            } else {
-                objective.current = Math.max(inputValue, objective.current);
-            }
+            const inputValue = parseInt(inputElement.value) || 0;
             
-            // Vérifier si l'objectif est nouvellement complété
-            if (objective.current >= objective.target && !appState.completedObjectives.includes(objective.id)) {
-                appState.completedObjectives.push(objective.id);
+            // Calculer la différence avec l'ancienne valeur
+            const oldValue = appState.history[dateStr][objective.id] || 0;
+            const valueDiff = inputValue - oldValue;
+            
+            // Enregistrer la nouvelle valeur d'entrée pour cette date
+            appState.history[dateStr][objective.id] = inputValue;
+            
+            // Mettre à jour la progression de l'objectif uniquement si la valeur a changé
+            if (valueDiff !== 0) {
+                objective.current += valueDiff;
                 
-                // Bonus XP pour objectif complet
-                totalXpEarned += objective.xpPerUnit * 10;
+                // Calculer l'XP gagnée pour la différence
+                let xpEarned = valueDiff * objective.xpPerUnit;
+                
+                // Si l'objectif est atteint pour la première fois, bonus d'XP
+                if (!appState.completedObjectives.includes(objective.id) && objective.current >= objective.target) {
+                    appState.completedObjectives.push(objective.id);
+                    xpEarned += 50; // Bonus d'XP pour avoir complété un objectif
+                }
+                
+                totalXpEarned += xpEarned;
             }
         });
     }
     
-    // Vérifier/mettre à jour les streaks
-    appState.daysActive++;
-    checkStreak();
+    // Si la date est aujourd'hui, mettre à jour les streaks
+    const today = new Date().toISOString().split('T')[0];
+    if (dateStr === today) {
+        // Vérifier et mettre à jour les flammes des objectifs
+        checkObjectiveStreaks();
+        
+        // Mettre à jour la date de dernière activité pour le streak global
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        
+        if (appState.lastActiveDate === yesterdayStr) {
+            // Continuer le streak
+            appState.currentStreak++;
+            
+            if (appState.currentStreak > appState.bestStreak) {
+                appState.bestStreak = appState.currentStreak;
+            }
+        } else if (appState.lastActiveDate !== today) {
+            // Réinitialiser le streak si le dernier jour actif n'était pas hier ni aujourd'hui
+            appState.currentStreak = 1;
+        }
+        
+        appState.lastActiveDate = today;
+    }
     
-    // Ajouter l'XP gagnée
+    // Ajouter l'XP gagnée au total du joueur
     if (totalXpEarned > 0) {
         addXp(totalXpEarned);
     }
     
-    // Vérifier les nouveaux badges déverrouillés
+    // Vérifier les nouveaux badges
     checkForNewBadges();
     
-    // Sauvegarder l'état
+    // Sauvegarder l'état de l'application
     saveAppState();
     
-    // Feedback utilisateur
-    alert(`Progression sauvegardée ! +${totalXpEarned} XP gagnés`);
+    // Afficher une notification de réussite
+    const notification = document.createElement('div');
+    notification.className = 'notification success';
+    notification.innerHTML = `
+        <i class="fas fa-check-circle"></i>
+        <p>Progrès sauvegardé pour ${formatDate(new Date(dateStr))} ! +${totalXpEarned} XP</p>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+    
+    // Mettre à jour l'interface
+    renderDailyInputs();
+    renderProgressView();
+    renderBadges();
+    renderStats();
+    
+    return totalXpEarned;
 }
 
 function getPreviousDayValue(objectiveId) {
+    if (!appState.history) return 0;
+    
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
+    
     const yesterdayStr = yesterday.toISOString().split('T')[0];
     
-    return (appState.dailyInputs[yesterdayStr] && appState.dailyInputs[yesterdayStr][objectiveId]) || 0;
+    if (appState.history[yesterdayStr] && appState.history[yesterdayStr][objectiveId] !== undefined) {
+        return appState.history[yesterdayStr][objectiveId];
+    }
+    
+    return 0;
 }
 
 // Sauvegarde et chargement de l'état
 function saveAppState() {
+    console.log("Sauvegarde de l'état de l'application");
+    
+    // Créer un état à sauvegarder avec les objectifs
     const stateToSave = {
         ...appState,
-        objectives // Inclure l'état des objectifs
+        objectives: objectives
     };
     
-    localStorage.setItem('objectiveTrackerState', JSON.stringify(stateToSave));
+    // Sauvegarder l'état complet
+    try {
+        localStorage.setItem('challengeAvrilAppState', JSON.stringify(stateToSave));
+        console.log("État sauvegardé avec succès");
+    } catch (error) {
+        console.error("Erreur lors de la sauvegarde de l'état:", error);
+    }
 }
 
 function loadAppState() {
-    const savedState = localStorage.getItem('objectiveTrackerState');
-    
-    if (savedState) {
-        const parsedState = JSON.parse(savedState);
-        
-        // Restaurer les objectifs
-        if (parsedState.objectives) {
-            for (const category in parsedState.objectives) {
-                parsedState.objectives[category].forEach((savedObj, index) => {
-                    if (objectives[category] && objectives[category][index]) {
-                        objectives[category][index].current = savedObj.current;
-                    }
-                });
+    console.log("Chargement de l'état de l'application");
+    try {
+        const savedState = localStorage.getItem('challengeAvrilAppState');
+        if (savedState) {
+            const parsedState = JSON.parse(savedState);
+            
+            // Restaurer les objectifs
+            if (parsedState.objectives) {
+                for (const category in parsedState.objectives) {
+                    parsedState.objectives[category].forEach((savedObj, index) => {
+                        if (objectives[category] && objectives[category][index]) {
+                            objectives[category][index].current = savedObj.current;
+                        }
+                    });
+                }
+                
+                delete parsedState.objectives; // Retirer les objectifs de l'état après restauration
             }
             
-            delete parsedState.objectives; // Retirer les objectifs de l'état après restauration
+            // Restaurer le reste de l'état
+            appState = {
+                ...appState, // Garder les valeurs par défaut
+                ...parsedState // Écraser avec les valeurs sauvegardées
+            };
+            
+            console.log("État chargé:", appState);
+        } else {
+            console.log("Aucun état sauvegardé trouvé, initialisation de l'état par défaut");
         }
         
-        // Restaurer le reste de l'état
-        appState = {
-            ...appState, // Garder les valeurs par défaut
-            ...parsedState // Écraser avec les valeurs sauvegardées
-        };
+        // S'assurer que toutes les propriétés existent
+        if (!appState.objectiveStreaks) appState.objectiveStreaks = {};
+        if (!appState.lastMissedDay) appState.lastMissedDay = {};
+        if (!appState.history) appState.history = {};
+        if (!appState.dailyInputs) appState.dailyInputs = {};
+        if (!appState.completedObjectives) appState.completedObjectives = [];
+        if (!appState.unlockedBadges) appState.unlockedBadges = [];
+        
+    } catch (error) {
+        console.error("Erreur lors du chargement de l'état:", error);
     }
 }
 
@@ -470,12 +714,314 @@ function setupNotifications() {
 
 // Initialisation de l'application
 function initApp() {
+    console.log("Initialisation de l'application...");
+    
+    // Charger l'état précédent
     loadAppState();
-    renderDailyInputs();
-    updateUIState();
-    setupEventListeners();
-    setupNotifications();
+    
+    // Vérifier les éléments DOM
+    console.log("Vérification des éléments DOM:");
+    console.log("- dailyInputs:", elements.dailyInputs ? "OK" : "MANQUANT");
+    console.log("- progressContainer:", elements.progressContainer ? "OK" : "MANQUANT");
+    
+    // Configuration des onglets
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    console.log(`${tabButtons.length} boutons d'onglets trouvés`);
+    
+    tabButtons.forEach(button => {
+        const tabId = button.id.replace('tab-', '');
+        console.log(`Configuration du bouton pour l'onglet: ${tabId}`);
+        
+        button.addEventListener('click', () => {
+            console.log(`Clic sur l'onglet: ${tabId}`);
+            switchTab(tabId);
+        });
+    });
+    
+    // Configuration des boutons de catégorie
+    const categoryButtons = document.querySelectorAll('.category-btn');
+    console.log(`${categoryButtons.length} boutons de catégorie trouvés`);
+    
+    categoryButtons.forEach(button => {
+        const category = button.getAttribute('data-category');
+        console.log(`Configuration du bouton pour la catégorie: ${category}`);
+        
+        button.addEventListener('click', () => {
+            console.log(`Clic sur la catégorie: ${category}`);
+            
+            // Désactiver tous les boutons de catégorie
+            categoryButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Activer le bouton cliqué
+            button.classList.add('active');
+            
+            // Mettre à jour la vue de progression avec la nouvelle catégorie
+            renderProgressView();
+        });
+    });
+    
+    // Configuration du bouton de fermeture de la modal
+    const closeModal = document.getElementById('close-modal');
+    if (closeModal) {
+        console.log("Configuration du bouton de fermeture de la modal");
+        closeModal.addEventListener('click', () => {
+            console.log("Clic sur le bouton de fermeture de la modal");
+            const levelUpModal = document.getElementById('level-up-modal');
+            if (levelUpModal) {
+                levelUpModal.style.display = 'none';
+            }
+        });
+    } else {
+        console.error("Bouton de fermeture de la modal non trouvé");
+    }
+    
+    // Afficher l'onglet par défaut (Aujourd'hui)
+    switchTab('daily');
+    
+    // Mettre à jour la date
+    updateDate();
+    
+    // Mettre à jour l'interface utilisateur
+    updateUI();
+    
+    console.log("Initialisation de l'application terminée");
 }
 
 // Démarrer l'application
-document.addEventListener('DOMContentLoaded', initApp); 
+document.addEventListener('DOMContentLoaded', initApp);
+
+function checkObjectiveStreaks() {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+    // Initialiser objectiveStreaks si nécessaire
+    if (!appState.objectiveStreaks) {
+        appState.objectiveStreaks = {};
+    }
+    
+    if (!appState.lastMissedDay) {
+        appState.lastMissedDay = {};
+    }
+    
+    // Vérifier chaque objectif
+    for (const category in objectives) {
+        objectives[category].forEach(objective => {
+            const objectiveId = objective.id;
+            
+            // Initialiser streak si nécessaire
+            if (!appState.objectiveStreaks[objectiveId]) {
+                appState.objectiveStreaks[objectiveId] = 0;
+            }
+            
+            // Vérifier si l'objectif a été réalisé aujourd'hui
+            const completedToday = appState.history[todayStr] && appState.history[todayStr][objectiveId] > 0;
+            
+            // Vérifier si l'objectif a été réalisé hier
+            const completedYesterday = appState.history[yesterdayStr] && appState.history[yesterdayStr][objectiveId] > 0;
+            
+            if (completedToday) {
+                // L'objectif a été réalisé aujourd'hui
+                appState.objectiveStreaks[objectiveId]++;
+                
+                // Réinitialiser le dernier jour manqué
+                appState.lastMissedDay[objectiveId] = null;
+            } else {
+                // L'objectif n'a pas été réalisé aujourd'hui
+                
+                if (!completedYesterday && appState.lastMissedDay[objectiveId]) {
+                    // Deux jours consécutifs manqués - réinitialiser la flamme
+                    appState.objectiveStreaks[objectiveId] = 0;
+                }
+                
+                // Enregistrer le jour manqué
+                appState.lastMissedDay[objectiveId] = todayStr;
+            }
+        });
+    }
+    
+    // Vérifier le streak global (flamme bleue)
+    const allObjectivesActive = Object.values(appState.objectiveStreaks).every(streak => streak > 0);
+    
+    if (allObjectivesActive) {
+        appState.currentStreak++;
+        
+        if (appState.currentStreak > appState.bestStreak) {
+            appState.bestStreak = appState.currentStreak;
+        }
+    } else {
+        appState.currentStreak = 0;
+    }
+}
+
+function renderObjectiveStreaks() {
+    // D'abord, vérifions si les conteneurs d'affichage des flammes existent
+    if (!document.getElementById('objective-flames-container')) {
+        // Créer le conteneur pour les flammes des objectifs
+        const flamesContainer = document.createElement('div');
+        flamesContainer.id = 'objective-flames-container';
+        flamesContainer.className = 'flames-container';
+        document.querySelector('.app-container').appendChild(flamesContainer);
+    }
+    
+    const flamesContainer = document.getElementById('objective-flames-container');
+    flamesContainer.innerHTML = '<h3>Flammes & Streaks</h3>';
+    
+    // Créer une section pour la flamme bleue (streak global)
+    const globalStreak = document.createElement('div');
+    globalStreak.className = 'flame-item global-flame';
+    
+    let globalFlameIcon = '';
+    if (appState.currentStreak >= 3) {
+        globalFlameIcon = '<div class="flame-icon blue">🔥</div>';
+    } else {
+        globalFlameIcon = '<div class="flame-icon inactive">🔥</div>';
+    }
+    
+    globalStreak.innerHTML = `
+        ${globalFlameIcon}
+        <div class="flame-details">
+            <div class="flame-title">Streak Global</div>
+            <div class="flame-count">${appState.currentStreak} jours</div>
+        </div>
+    `;
+    flamesContainer.appendChild(globalStreak);
+    
+    // Ajouter une séparation
+    flamesContainer.appendChild(document.createElement('hr'));
+    
+    // Ajouter les flammes pour chaque objectif
+    for (const category in objectives) {
+        objectives[category].forEach(objective => {
+            const objectiveId = objective.id;
+            const streakCount = appState.objectiveStreaks[objectiveId] || 0;
+            
+            const flameItem = document.createElement('div');
+            flameItem.className = 'flame-item';
+            
+            let streakIcon = '';
+            
+            // Vérifier si nous avons raté un jour récemment
+            const missedDay = appState.lastMissedDay && appState.lastMissedDay[objectiveId];
+            const showHourglass = missedDay !== null;
+            
+            if (streakCount >= 3) {
+                // Flamme active si 3+ jours
+                streakIcon = `<div class="flame-icon active">🔥</div>`;
+                
+                // Ajouter un sablier si un jour a été raté
+                if (showHourglass) {
+                    streakIcon += `<div class="hourglass-icon">⌛</div>`;
+                }
+            } else if (streakCount > 0) {
+                // Streak commencé mais < 3 jours
+                streakIcon = `<div class="flame-icon building">${streakCount}</div>`;
+            } else {
+                // Pas de streak
+                streakIcon = `<div class="flame-icon inactive">·</div>`;
+            }
+            
+            flameItem.innerHTML = `
+                <div class="streak-icons">
+                    ${streakIcon}
+                </div>
+                <div class="flame-details">
+                    <div class="flame-title">${objective.title}</div>
+                    <div class="flame-count">${streakCount} jours</div>
+                </div>
+            `;
+            
+            flamesContainer.appendChild(flameItem);
+        });
+    }
+}
+
+function switchTab(tabId) {
+    console.log("Changement d'onglet vers:", tabId);
+    
+    // Récupérer tous les contenus d'onglets
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    // Masquer tous les contenus d'onglets
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Récupérer tous les boutons d'onglets
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    
+    // Désactiver tous les boutons d'onglets
+    tabButtons.forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Trouver l'onglet à activer
+    const targetTab = document.getElementById(`${tabId}-tab`);
+    const targetButton = document.getElementById(`tab-${tabId}`);
+    
+    // Activer l'onglet et le bouton sélectionnés
+    if (targetTab) {
+        targetTab.classList.add('active');
+        console.log(`Onglet ${tabId}-tab activé`);
+    } else {
+        console.error(`Onglet ${tabId}-tab non trouvé`);
+    }
+    
+    if (targetButton) {
+        targetButton.classList.add('active');
+        console.log(`Bouton tab-${tabId} activé`);
+    } else {
+        console.error(`Bouton tab-${tabId} non trouvé`);
+    }
+    
+    // Mettre à jour les vues selon l'onglet
+    if (tabId === 'daily') {
+        renderDailyInputs();
+    } else if (tabId === 'progress') {
+        renderProgressView();
+    } else if (tabId === 'stats') {
+        renderStats();
+    }
+}
+
+function switchCategory(category) {
+    // Désactiver tous les boutons de catégorie
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Activer la catégorie sélectionnée
+    document.querySelector(`.category-btn[data-category="${category}"]`).classList.add('active');
+    
+    // Mettre à jour la vue de progression
+    renderProgressView();
+}
+
+function renderStats() {
+    console.log("Rendu des statistiques");
+    
+    // Mise à jour des statistiques de base
+    elements.currentStreak.textContent = appState.currentStreak || 0;
+    elements.bestStreak.textContent = appState.bestStreak || 0;
+    elements.objectivesCompleted.textContent = appState.completedObjectives.length || 0;
+    elements.completionPercentage.textContent = calculateCompletionPercentage() + '%';
+    
+    // Afficher les badges débloqués
+    elements.badgesContainer.innerHTML = '';
+    
+    // Créer un exemple de badge
+    const exampleBadge = document.createElement('div');
+    exampleBadge.className = 'badge-item';
+    exampleBadge.innerHTML = `
+        <div class="badge-icon">🔥</div>
+        <div class="badge-info">
+            <div class="badge-title">Premier jour</div>
+            <div class="badge-description">Premier jour de suivi</div>
+        </div>
+    `;
+    
+    elements.badgesContainer.appendChild(exampleBadge);
+} 
