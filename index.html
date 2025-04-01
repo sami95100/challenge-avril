@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenge Avril</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3498db">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Challenge Avril</h1>
+            <div class="level-info">
+                <span class="level">Niveau <span id="current-level">1</span></span>
+                <div class="xp-bar"><div id="xp-progress"></div></div>
+                <span id="xp-count">0 XP</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button id="tab-daily" class="tab-btn active">Aujourd'hui</button>
+            <button id="tab-progress" class="tab-btn">Progression</button>
+            <button id="tab-stats" class="tab-btn">Stats</button>
+        </div>
+
+        <div id="daily-tab" class="tab-content active">
+            <h2>Suivi du <span id="current-date"></span></h2>
+            <div id="daily-inputs"></div>
+            <button id="save-progress" class="action-btn">Sauvegarder Progression</button>
+        </div>
+
+        <div id="progress-tab" class="tab-content">
+            <h2>Progression Globale</h2>
+            <div class="categories">
+                <button class="category-btn active" data-category="personal">Perso</button>
+                <button class="category-btn" data-category="professional">Pro</button>
+            </div>
+            <div id="progress-container"></div>
+        </div>
+
+        <div id="stats-tab" class="tab-content">
+            <h2>Vos Statistiques</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🔥</div>
+                    <div class="stat-value" id="current-streak">0</div>
+                    <div class="stat-label">Jours consécutifs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-value" id="objectives-completed">0</div>
+                    <div class="stat-label">Objectifs complétés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value" id="completion-percentage">0%</div>
+                    <div class="stat-label">Progression totale</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🏆</div>
+                    <div class="stat-value" id="best-streak">0</div>
+                    <div class="stat-label">Meilleur streak</div>
+                </div>
+            </div>
+            <div class="achievements">
+                <h3>Badges débloqués</h3>
+                <div id="badges-container" class="badges-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="level-up-modal" class="modal">
+        <div class="modal-content">
+            <h2>NIVEAU SUPÉRIEUR!</h2>
+            <div class="level-up-animation">🎮</div>
+            <p>Vous avez atteint le niveau <span id="new-level">2</span>!</p>
+            <button id="close-modal" class="action-btn">Continuer</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+              .then(reg => console.log('Service Worker registered', reg))
+              .catch(err => console.error('Service Worker error', err));
+        }
+    </script>
+</body>
+</html> 
