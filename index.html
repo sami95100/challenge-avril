@@ -3,90 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Challenge Avril</title>
+    <title>TaqwaTrack - Suivi d'objectifs</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3498db">
     <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Titillium+Web:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <h1>Challenge Avril</h1>
-            <div class="level-info">
-                <span class="level">Niveau <span id="current-level">1</span></span>
-                <div class="xp-bar"><div id="xp-progress"></div></div>
-                <span id="xp-count">0 XP</span>
+    <!-- Container d'authentification -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-box">
+            <div class="app-branding">
+                <h1 class="app-name">TaqwaTrack</h1>
+                <p class="app-slogan">Maîtrise ton Nafs, accomplis tes objectifs</p>
             </div>
+            
+            <h2 id="auth-title">Connexion</h2>
+            
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="votre@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Mot de passe</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <div id="login-error" class="error-message"></div>
+                <button type="button" id="login-submit" class="auth-button">Se connecter</button>
+                <p class="auth-switch">Pas encore de compte? <a href="#" id="show-signup">Créer un compte</a></p>
+            </form>
+            
+            <form id="signup-form" class="auth-form" style="display: none;">
+                <div class="form-group">
+                    <label for="signup-username">Nom d'utilisateur</label>
+                    <input type="text" id="signup-username" placeholder="Votre nom" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" placeholder="votre@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Mot de passe</label>
+                    <input type="password" id="signup-password" placeholder="••••••••" required>
+                </div>
+                <div id="signup-error" class="error-message"></div>
+                <button type="button" id="signup-submit" class="auth-button">Créer un compte</button>
+                <p class="auth-switch">Déjà un compte? <a href="#" id="show-login">Se connecter</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Conteneur principal de l'application -->
+    <div class="app-container" style="display: none;">
+        <header class="app-header">
+            <h1 class="app-title">TAQWATRACK</h1>
+            <div class="level-display">
+                <div class="level-title">Niveau <span id="current-level">1</span></div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="xp-progress"></div>
+                </div>
+                <div class="xp-display" id="xp-count">0 XP</div>
+            </div>
+            <div id="debug-info" style="display: none; font-size: 10px; color: #666; margin-top: 5px;"></div>
         </header>
 
-        <div class="tabs">
+        <div class="tab-navigation">
             <button id="tab-daily" class="tab-btn active">Aujourd'hui</button>
             <button id="tab-progress" class="tab-btn">Progression</button>
             <button id="tab-stats" class="tab-btn">Stats</button>
         </div>
 
-        <div id="daily-tab" class="tab-content active">
-            <h2>Suivi du <span id="current-date"></span></h2>
-            <div id="daily-inputs"></div>
-        </div>
+        <div class="tab-content-container">
+            <div id="daily-tab" class="tab-content active">
+                <h2>Suivi du <span id="current-date">1 avril</span></h2>
+                <div id="daily-inputs" class="content-section"></div>
+            </div>
 
-        <div id="progress-tab" class="tab-content">
-            <h2>Progression Globale</h2>
-            <div class="categories">
-                <button class="category-btn active" data-category="personal">Perso</button>
-                <button class="category-btn" data-category="professional">Pro</button>
+            <div id="progress-tab" class="tab-content">
+                <h2>Progression Globale</h2>
+                <div class="category-selector">
+                    <button data-category="personal" class="category-btn active" id="category-btn-personal">Perso</button>
+                    <button data-category="professional" class="category-btn" id="category-btn-professional">Pro</button>
+                </div>
+                <div id="progress-container" class="content-section"></div>
             </div>
-            <div id="progress-container"></div>
-        </div>
 
-        <div id="stats-tab" class="tab-content">
-            <h2>Vos Statistiques</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🔥</div>
-                    <div class="stat-value" id="current-streak">0</div>
-                    <div class="stat-label">Jours consécutifs</div>
+            <div id="stats-tab" class="tab-content">
+                <h2>Vos Statistiques</h2>
+                <div id="stats-container" class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-value" id="current-streak">0</div>
+                        <div class="stat-label">Jours consécutifs</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value" id="objectives-completed">0</div>
+                        <div class="stat-label">Objectifs complétés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="completion-percentage">0%</div>
+                        <div class="stat-label">Progression totale</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-value" id="best-streak">0</div>
+                        <div class="stat-label">Meilleur streak</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">⭐</div>
-                    <div class="stat-value" id="objectives-completed">0</div>
-                    <div class="stat-label">Objectifs complétés</div>
+                <div class="achievements">
+                    <h3>Badges débloqués</h3>
+                    <div id="badges-container" class="badges-grid"></div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📊</div>
-                    <div class="stat-value" id="completion-percentage">0%</div>
-                    <div class="stat-label">Progression totale</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🏆</div>
-                    <div class="stat-value" id="best-streak">0</div>
-                    <div class="stat-label">Meilleur streak</div>
-                </div>
-            </div>
-            <div class="achievements">
-                <h3>Badges débloqués</h3>
-                <div id="badges-container" class="badges-grid"></div>
             </div>
         </div>
+        
+        <button id="logout-btn" class="logout-btn">Se déconnecter</button>
     </div>
 
     <div id="level-up-modal" class="modal">
         <div class="modal-content">
-            <h2>NIVEAU SUPÉRIEUR!</h2>
-            <div class="level-up-animation">🎮</div>
-            <p>Vous avez atteint le niveau <span id="new-level">2</span>!</p>
-            <button id="close-modal" class="action-btn">CONTINUER</button>
+            <span id="close-modal" class="close-modal">&times;</span>
+            <h2>Niveau Supérieur!</h2>
+            <div class="level-up-icon">🎉</div>
+            <p>Félicitations! Vous avez atteint le niveau <span id="new-level">2</span>!</p>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Console de débogage -->
+    <div id="debug-console" style="position: fixed; bottom: 0; left: 0; right: 0; background: #111; color: #0f0; font-family: monospace; font-size: 12px; padding: 5px; max-height: 100px; overflow-y: auto; display: none;">
+        <div id="objectives-debug">Chargement des objectifs...</div>
+    </div>
+
+    <!-- Import de la bibliothèque Supabase - assurez-vous qu'elle est chargée en premier et non en module -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Script de débogage pour les appareils mobiles -->
     <script>
+        // Fonction pour afficher les erreurs de console sur mobile
+        window.onerror = function(message, source, lineno, colno, error) {
+            const debugConsole = document.getElementById('debug-console');
+            debugConsole.style.display = 'block';
+            debugConsole.innerHTML += `<p>ERREUR: ${message} (${source}:${lineno}:${colno})</p>`;
+        };
+
+        console.error = function(message) {
+            const debugConsole = document.getElementById('debug-console');
+            debugConsole.style.display = 'block';
+            debugConsole.innerHTML += `<p>ERREUR CONSOLE: ${message}</p>`;
+        };
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
               .then(reg => console.log('Service Worker registered', reg))
               .catch(err => console.error('Service Worker error', err));
         }
+    </script>
+    
+    <!-- Import de nos scripts JavaScript -->
+    <script type="module" src="supabase.js"></script>
+    <script type="module" src="app.js"></script>
+
+    <!-- Script pour activer la console de débogage -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Activer la console de débogage en appuyant 5 fois sur le titre de l'application
+        let tapCount = 0;
+        document.querySelector('.app-title').addEventListener('click', function() {
+            tapCount++;
+            if (tapCount >= 5) {
+                document.getElementById('debug-console').style.display = 'block';
+                document.getElementById('debug-info').style.display = 'block';
+                
+                // Afficher des informations sur les objectifs
+                const objectivesDebug = document.getElementById('objectives-debug');
+                if (window.objectives) {
+                    objectivesDebug.textContent = `Objectifs personnels: ${window.objectives.personal ? window.objectives.personal.length : 0}, Objectifs professionnels: ${window.objectives.professional ? window.objectives.professional.length : 0}`;
+                } else {
+                    objectivesDebug.textContent = "La variable 'objectives' n'est pas définie";
+                }
+                
+                tapCount = 0;
+            }
+        });
+    });
     </script>
 </body>
 </html> 

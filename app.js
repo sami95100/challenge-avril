@@ -1,5 +1,11 @@
-// Définition des objectifs
-const objectives = {
+console.log("APP.JS CHARGÉ");
+
+// Import des fonctions Supabase
+import { supabase, getCurrentUser, loginUser, signupUser, logoutUser, loadUserData, saveUserProgress } from './supabase.js';
+
+// Définition des objectifs (sera remplacée par les données de Supabase après connexion)
+// Rendre les objectifs accessibles globalement
+window.objectives = {
     personal: [
         { id: 'running', title: 'Courir', target: 150, unit: 'km', current: 0, xpPerUnit: 10 },
         { id: 'pushups', title: 'Pompes', target: 1500, unit: 'pompes', current: 0, xpPerUnit: 1 },
@@ -18,6 +24,9 @@ const objectives = {
         { id: 'focusTime', title: 'Sessions focus (max 3x25min)', target: 1, unit: 'sessions', isDaily: true, current: 0, xpPerUnit: 20 }
     ]
 };
+
+// Référence à la variable objectives pour usage dans le script
+const objectives = window.objectives;
 
 // Configuration du système de niveau
 const levelConfig = {
@@ -137,7 +146,7 @@ function addXp(amount) {
         elements.levelUpModal.style.display = 'flex';
     }
     
-    updateUIState();
+    updateUI();
 }
 
 function calculateCompletionPercentage() {
@@ -213,7 +222,7 @@ function checkStreak() {
     appState.lastActiveDate = todayStr;
 }
 
-function updateUIState() {
+function updateUI() {
     // Mettre à jour la date
     const today = new Date();
     elements.currentDate.textContent = formatDate(today);
@@ -241,7 +250,34 @@ function updateUIState() {
 // Rendu de l'interface utilisateur
 function renderDailyInputs() {
     console.log("Rendu des inputs quotidiens");
+    
+    // Vérifier si elements.dailyInputs existe
+    if (!elements.dailyInputs) {
+        console.error("Le conteneur dailyInputs n'existe pas");
+        elements.dailyInputs = document.getElementById('daily-inputs');
+        if (!elements.dailyInputs) {
+            console.error("Impossible de trouver le conteneur #daily-inputs dans le DOM");
+            return;
+        }
+    }
+    
     elements.dailyInputs.innerHTML = '';
+    
+    // Vérifier si objectives est correctement initialisé
+    if (!objectives || typeof objectives !== 'object') {
+        console.error("La variable objectives n'est pas correctement initialisée:", objectives);
+        elements.dailyInputs.innerHTML = '<p class="error-message">Erreur de chargement des objectifs. Veuillez rafraîchir la page.</p>';
+        return;
+    }
+    
+    console.log("Objectifs disponibles:", objectives);
+    console.log("Catégories d'objectifs:", Object.keys(objectives));
+    
+    if (!objectives.personal || !objectives.professional) {
+        console.error("Les catégories d'objectifs requises sont manquantes");
+        // S'assurer que les objectifs par défaut sont initialisés
+        initializeDefaultObjectives();
+    }
     
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -253,12 +289,16 @@ function renderDailyInputs() {
     const yesterdayStr = yesterday.toISOString().split('T')[0];
     const yesterdayData = appState.history[yesterdayStr] || {};
     
-    // Ajouter un sélecteur de date (aujourd'hui/hier)
+    // Log des objectifs pour le débogage
+    console.log("Objectifs personnels:", objectives.personal.length);
+    console.log("Objectifs professionnels:", objectives.professional.length);
+    
+    // Ajouter un sélecteur de date (hier/aujourd'hui) - inverser l'ordre
     const dateSelector = document.createElement('div');
     dateSelector.className = 'date-selector';
     dateSelector.innerHTML = `
-        <button id="today-btn" class="date-btn active">Aujourd'hui (${formatDate(today)})</button>
         <button id="yesterday-btn" class="date-btn">Hier (${formatDate(yesterday)})</button>
+        <button id="today-btn" class="date-btn active">Aujourd'hui (${formatDate(today)})</button>
     `;
     elements.dailyInputs.appendChild(dateSelector);
     
@@ -270,11 +310,17 @@ function renderDailyInputs() {
     
     // Fonction pour rendre les inputs d'une journée spécifique
     function renderDateInputs(dateStr, dateData, dateTitle) {
+        console.log(`Rendu des inputs pour ${dateTitle}`, dateData);
         inputsContainer.innerHTML = '';
         elements.currentDate.textContent = dateTitle;
         
         // Parcourir les catégories d'objectifs
         for (const category in objectives) {
+            if (!objectives[category] || !Array.isArray(objectives[category]) || objectives[category].length === 0) {
+                console.error(`Catégorie d'objectifs invalide ou vide: ${category}`);
+                continue;
+            }
+            
             const categoryTitle = category === 'personal' ? 'Objectifs Personnels' : 'Objectifs Professionnels';
             
             const categorySection = document.createElement('div');
@@ -340,7 +386,7 @@ function renderDailyInputs() {
         renderDateInputs(yesterdayStr, yesterdayData, formatDate(yesterday));
     });
     
-    console.log("Inputs quotidiens rendus");
+    console.log("Inputs quotidiens rendus avec succès");
 }
 
 function renderProgressView() {
@@ -504,7 +550,285 @@ function setupEventListeners() {
     });
 }
 
-function saveProgress(dateStr) {
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("Initialisation de l'application");
+    
+    // Forcer l'initialisation des objectifs par défaut dès le démarrage
+    initializeDefaultObjectives();
+    console.log("Initialisation des objectifs par défaut...");
+    console.log("Objectifs personnels:", objectives.personal.length);
+    console.log("Objectifs professionnels:", objectives.professional.length);
+    
+    // Vérifier si l'utilisateur est déjà connecté
+    try {
+        const user = await getCurrentUser();
+        console.log("User status:", user ? "Connecté" : "Non connecté", user);
+        
+        if (user) {
+            // Utilisateur connecté, charger ses données
+            hideAuthScreen();
+            showLoadingIndicator();
+            
+            try {
+                const userData = await loadUserData(user.id);
+                console.log("Données utilisateur brutes:", userData);
+                
+                if (userData) {
+                    // Mettre à jour les objectifs et l'appState avec les données de l'utilisateur
+                    if (userData.objectives) {
+                        // S'assurer que les objectifs sont correctement structurés
+                        if (userData.objectives.personal && userData.objectives.personal.length > 0) {
+                            objectives.personal = userData.objectives.personal;
+                            console.log("Objectifs personnels chargés:", objectives.personal.length);
+                        } else {
+                            console.warn("Aucun objectif personnel trouvé dans Supabase, utilisation des valeurs par défaut");
+                        }
+                        
+                        if (userData.objectives.professional && userData.objectives.professional.length > 0) {
+                            objectives.professional = userData.objectives.professional;
+                            console.log("Objectifs professionnels chargés:", objectives.professional.length);
+                        } else {
+                            console.warn("Aucun objectif professionnel trouvé dans Supabase, utilisation des valeurs par défaut");
+                        }
+                    } else {
+                        console.warn("Aucun objectif trouvé dans les données utilisateur");
+                    }
+                    
+                    if (userData.profile) {
+                        appState.level = userData.profile.level || 1;
+                        appState.xp = userData.profile.xp || 0;
+                        appState.currentStreak = userData.profile.current_streak || 0;
+                        appState.bestStreak = userData.profile.best_streak || 0;
+                        appState.daysActive = userData.profile.days_active || 1;
+                        appState.lastActiveDate = userData.profile.last_active_date;
+                    }
+                    
+                    appState.unlockedBadges = userData.unlockedBadges || ['firstDay'];
+                    appState.history = userData.history || {};
+                    
+                    console.log("Données utilisateur chargées:", userData);
+                } else {
+                    console.warn("Aucune donnée utilisateur trouvée, objectifs par défaut déjà initialisés");
+                }
+            } catch (error) {
+                console.error("Erreur lors du chargement des données:", error);
+                console.log("Utilisation des objectifs par défaut (déjà initialisés)");
+            } finally {
+                hideLoadingIndicator();
+                initApp();
+            }
+        } else {
+            // Utilisateur non connecté, afficher l'écran de connexion
+            showAuthScreen();
+            setupAuthEvents();
+        }
+    } catch (error) {
+        console.error("Erreur lors de la vérification de l'utilisateur:", error);
+        showAuthScreen();
+        setupAuthEvents();
+    }
+});
+
+// Fonction pour initialiser des objectifs par défaut (si les données ne sont pas disponibles)
+function initializeDefaultObjectives() {
+    console.log("Initialisation des objectifs par défaut en local");
+    objectives.personal = [
+        { id: 'running', title: 'Courir', target: 150, unit: 'km', current: 0, xpPerUnit: 10 },
+        { id: 'pushups', title: 'Pompes', target: 1500, unit: 'pompes', current: 0, xpPerUnit: 1 },
+        { id: 'pullups', title: 'Tractions', target: 300, unit: 'tractions', current: 0, xpPerUnit: 5 },
+        { id: 'frenchAudio', title: 'Lecture audio français/arabe', target: 300, unit: 'pages', current: 0, xpPerUnit: 5 },
+        { id: 'birthBook', title: 'Livre naissance', target: 200, unit: 'pages', current: 0, xpPerUnit: 5 },
+        { id: 'quranReading', title: 'Lecture du Coran (4 pages)', target: 30, unit: 'lectures', current: 0, xpPerUnit: 20 },
+        { id: 'quranLearning', title: 'Mémorisation Coran', target: 2, unit: 'pages', current: 0, xpPerUnit: 50 },
+        { id: 'mosquePrayer', title: 'Prières à la mosquée', target: 30, unit: 'prières', current: 0, xpPerUnit: 10 },
+        { id: 'extraPrayers', title: 'Prières surérogatoires', target: 150, unit: 'unités', current: 0, xpPerUnit: 2 },
+        { id: 'fasting', title: 'Jeûne', target: 8, unit: 'jours', current: 0, xpPerUnit: 30 },
+        { id: 'sleep', title: 'Sommeil', target: 250, unit: 'heures', isReverse: true, current: 0, xpPerUnit: 1 }
+    ];
+    
+    objectives.professional = [
+        { id: 'shortVideos', title: 'Vidéos courtes', target: 60, unit: 'vidéos', current: 0, xpPerUnit: 15 },
+        { id: 'focusTime', title: 'Sessions focus (max 3x25min)', target: 1, unit: 'sessions', isDaily: true, current: 0, xpPerUnit: 20 }
+    ];
+}
+
+// Configuration des événements d'authentification
+function setupAuthEvents() {
+    console.log("Configuration des événements d'authentification");
+    
+    // Basculer entre les formulaires de connexion et d'inscription
+    document.getElementById('show-signup').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('signup-form').style.display = 'block';
+        document.getElementById('auth-title').textContent = 'Créer un compte';
+        document.getElementById('login-error').textContent = '';
+    });
+    
+    document.getElementById('show-login').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('signup-form').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('auth-title').textContent = 'Connexion';
+        document.getElementById('signup-error').textContent = '';
+    });
+    
+    // Connexion
+    document.getElementById('login-submit').addEventListener('click', async () => {
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errorElement = document.getElementById('login-error');
+        
+        // Réinitialiser le message d'erreur
+        errorElement.textContent = '';
+        
+        if (!email || !password) {
+            errorElement.textContent = "Veuillez remplir tous les champs";
+            return;
+        }
+        
+        showLoadingIndicator();
+        
+        try {
+            await loginUser(email, password);
+            const user = await getCurrentUser();
+            
+            if (user) {
+                const userData = await loadUserData(user.id);
+                if (userData) {
+                    // Mettre à jour les objectifs et l'appState avec les données de l'utilisateur
+                    if (userData.objectives) {
+                        objectives.personal = userData.objectives.personal || [];
+                        objectives.professional = userData.objectives.professional || [];
+                    }
+                    
+                    if (userData.profile) {
+                        appState.level = userData.profile.level || 1;
+                        appState.xp = userData.profile.xp || 0;
+                        appState.currentStreak = userData.profile.current_streak || 0;
+                        appState.bestStreak = userData.profile.best_streak || 0;
+                        appState.daysActive = userData.profile.days_active || 1;
+                        appState.lastActiveDate = userData.profile.last_active_date;
+                    }
+                    
+                    appState.unlockedBadges = userData.unlockedBadges || ['firstDay'];
+                    appState.history = userData.history || {};
+                }
+                
+                hideAuthScreen();
+                initApp();
+            }
+        } catch (error) {
+            console.error("Erreur de connexion:", error);
+            errorElement.textContent = `Erreur de connexion: ${error.message || "Vérifiez vos identifiants"}`;
+        } finally {
+            hideLoadingIndicator();
+        }
+    });
+    
+    // Inscription
+    document.getElementById('signup-submit').addEventListener('click', async () => {
+        const username = document.getElementById('signup-username').value;
+        const email = document.getElementById('signup-email').value;
+        const password = document.getElementById('signup-password').value;
+        const errorElement = document.getElementById('signup-error');
+        
+        // Réinitialiser le message d'erreur
+        errorElement.textContent = '';
+        
+        if (!username || !email || !password) {
+            errorElement.textContent = "Veuillez remplir tous les champs";
+            return;
+        }
+        
+        if (password.length < 6) {
+            errorElement.textContent = "Le mot de passe doit contenir au moins 6 caractères";
+            return;
+        }
+        
+        showLoadingIndicator();
+        
+        try {
+            await signupUser(email, password, username);
+            alert("Compte créé avec succès! Vous pouvez maintenant vous connecter.");
+            
+            // Afficher le formulaire de connexion
+            document.getElementById('signup-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('auth-title').textContent = 'Connexion';
+            
+            // Pré-remplir l'email
+            document.getElementById('login-email').value = email;
+        } catch (error) {
+            console.error("Erreur d'inscription:", error);
+            errorElement.textContent = `Erreur d'inscription: ${error.message || "Vérifiez vos informations"}`;
+        } finally {
+            hideLoadingIndicator();
+        }
+    });
+    
+    // Ajouter des écouteurs d'événements pour soumettre les formulaires avec Enter
+    document.getElementById('login-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('login-submit').click();
+        }
+    });
+    
+    document.getElementById('signup-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('signup-submit').click();
+        }
+    });
+    
+    // Déconnexion
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+            await logoutUser();
+            showAuthScreen();
+        } catch (error) {
+            console.error("Erreur de déconnexion:", error);
+            alert(`Erreur de déconnexion: ${error.message}`);
+        }
+    });
+}
+
+// Fonction pour cacher l'écran d'authentification et afficher l'application
+function hideAuthScreen() {
+    document.getElementById('auth-container').style.display = 'none';
+    document.querySelector('.app-container').style.display = 'flex';
+}
+
+// Fonction pour afficher l'écran d'authentification et cacher l'application
+function showAuthScreen() {
+    document.getElementById('auth-container').style.display = 'flex';
+    document.querySelector('.app-container').style.display = 'none';
+}
+
+// Fonction pour afficher un indicateur de chargement
+function showLoadingIndicator() {
+    // Créer un élément de chargement s'il n'existe pas déjà
+    if (!document.getElementById('loading-indicator')) {
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'loading-indicator';
+        loadingIndicator.className = 'loading-indicator';
+        loadingIndicator.innerHTML = '<div class="spinner"></div><p>Chargement...</p>';
+        document.body.appendChild(loadingIndicator);
+    }
+    
+    document.getElementById('loading-indicator').style.display = 'flex';
+}
+
+// Fonction pour cacher l'indicateur de chargement
+function hideLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+// Mise à jour de la fonction saveProgress pour utiliser Supabase
+async function saveProgress(dateStr) {
     // Si aucune date n'est spécifiée, utiliser la date d'aujourd'hui
     if (!dateStr) {
         dateStr = new Date().toISOString().split('T')[0];
@@ -596,8 +920,30 @@ function saveProgress(dateStr) {
     // Vérifier les nouveaux badges
     checkForNewBadges();
     
-    // Sauvegarder l'état de l'application
-    saveAppState();
+    // Sauvegarder les données sur Supabase
+    const user = await getCurrentUser();
+    if (user) {
+        showLoadingIndicator();
+        try {
+            await saveUserProgress(
+                user.id, 
+                dateStr, 
+                appState.history[dateStr], 
+                appState, 
+                objectives
+            );
+            console.log("Données sauvegardées sur Supabase");
+        } catch (error) {
+            console.error("Erreur lors de la sauvegarde sur Supabase:", error);
+            // Fallback: sauvegarder en local
+            saveAppState();
+        } finally {
+            hideLoadingIndicator();
+        }
+    } else {
+        // Fallback: sauvegarder en local si non connecté
+        saveAppState();
+    }
     
     // Afficher une notification de réussite
     const notification = document.createElement('div');
@@ -724,11 +1070,15 @@ function initApp() {
     console.log("- dailyInputs:", elements.dailyInputs ? "OK" : "MANQUANT");
     console.log("- progressContainer:", elements.progressContainer ? "OK" : "MANQUANT");
     
-    // Configuration des onglets
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    console.log(`${tabButtons.length} boutons d'onglets trouvés`);
+    // Stocker les références globales aux éléments tabButtons et tabContents
+    elements.tabButtons = document.querySelectorAll('.tab-btn');
+    elements.tabContents = document.querySelectorAll('.tab-content');
+    elements.categoryButtons = document.querySelectorAll('.category-btn');
     
-    tabButtons.forEach(button => {
+    console.log(`${elements.tabButtons.length} boutons d'onglets trouvés`);
+    
+    // Configuration des onglets
+    elements.tabButtons.forEach(button => {
         const tabId = button.id.replace('tab-', '');
         console.log(`Configuration du bouton pour l'onglet: ${tabId}`);
         
@@ -739,10 +1089,9 @@ function initApp() {
     });
     
     // Configuration des boutons de catégorie
-    const categoryButtons = document.querySelectorAll('.category-btn');
-    console.log(`${categoryButtons.length} boutons de catégorie trouvés`);
+    console.log(`${elements.categoryButtons.length} boutons de catégorie trouvés`);
     
-    categoryButtons.forEach(button => {
+    elements.categoryButtons.forEach(button => {
         const category = button.getAttribute('data-category');
         console.log(`Configuration du bouton pour la catégorie: ${category}`);
         
@@ -750,7 +1099,7 @@ function initApp() {
             console.log(`Clic sur la catégorie: ${category}`);
             
             // Désactiver tous les boutons de catégorie
-            categoryButtons.forEach(btn => btn.classList.remove('active'));
+            elements.categoryButtons.forEach(btn => btn.classList.remove('active'));
             
             // Activer le bouton cliqué
             button.classList.add('active');
@@ -783,6 +1132,10 @@ function initApp() {
     
     // Mettre à jour l'interface utilisateur
     updateUI();
+    
+    // Afficher les objectifs après l'initialisation
+    console.log("Rendu forcé des objectifs");
+    renderDailyInputs();
     
     console.log("Initialisation de l'application terminée");
 }
@@ -942,23 +1295,29 @@ function renderObjectiveStreaks() {
 function switchTab(tabId) {
     console.log("Changement d'onglet vers:", tabId);
     
-    // Récupérer tous les contenus d'onglets
-    const tabContents = document.querySelectorAll('.tab-content');
+    // Vérifier si les éléments sont bien définis
+    if (!elements.tabButtons || !elements.tabContents) {
+        console.error("Les références aux onglets ne sont pas correctement initialisées");
+        elements.tabButtons = document.querySelectorAll('.tab-btn');
+        elements.tabContents = document.querySelectorAll('.tab-content');
+        
+        if (!elements.tabButtons || !elements.tabContents) {
+            console.error("Impossible de trouver les éléments des onglets dans le DOM");
+            return;
+        }
+    }
     
     // Masquer tous les contenus d'onglets
-    tabContents.forEach(content => {
+    elements.tabContents.forEach(content => {
         content.classList.remove('active');
     });
     
-    // Récupérer tous les boutons d'onglets
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    
     // Désactiver tous les boutons d'onglets
-    tabButtons.forEach(btn => {
+    elements.tabButtons.forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Trouver l'onglet à activer
+    // Trouver l'onglet et le bouton à activer
     const targetTab = document.getElementById(`${tabId}-tab`);
     const targetButton = document.getElementById(`tab-${tabId}`);
     
@@ -979,10 +1338,13 @@ function switchTab(tabId) {
     
     // Mettre à jour les vues selon l'onglet
     if (tabId === 'daily') {
+        console.log("Rendu des inputs quotidiens pour l'onglet 'daily'");
         renderDailyInputs();
     } else if (tabId === 'progress') {
+        console.log("Rendu de la progression pour l'onglet 'progress'");
         renderProgressView();
     } else if (tabId === 'stats') {
+        console.log("Rendu des statistiques pour l'onglet 'stats'");
         renderStats();
     }
 }
@@ -1009,19 +1371,91 @@ function renderStats() {
     elements.objectivesCompleted.textContent = appState.completedObjectives.length || 0;
     elements.completionPercentage.textContent = calculateCompletionPercentage() + '%';
     
+    // Vérifier si l'élément badgesContainer existe
+    if (!elements.badgesContainer) {
+        console.error("Container de badges non trouvé dans renderStats");
+        return;
+    }
+    
     // Afficher les badges débloqués
     elements.badgesContainer.innerHTML = '';
     
-    // Créer un exemple de badge
-    const exampleBadge = document.createElement('div');
-    exampleBadge.className = 'badge-item';
-    exampleBadge.innerHTML = `
-        <div class="badge-icon">🔥</div>
-        <div class="badge-info">
-            <div class="badge-title">Premier jour</div>
-            <div class="badge-description">Premier jour de suivi</div>
-        </div>
-    `;
+    // Afficher les badges du système
+    badges.forEach(badge => {
+        const isUnlocked = appState.unlockedBadges && appState.unlockedBadges.includes(badge.id);
+        
+        const badgeElement = document.createElement('div');
+        badgeElement.className = `badge-item ${isUnlocked ? 'badge-unlocked' : 'badge-locked'}`;
+        
+        badgeElement.innerHTML = `
+            <div class="badge-icon">${badge.icon}</div>
+            <div class="badge-info">
+                <div class="badge-title">${badge.title}</div>
+                <div class="badge-description">${badge.description}</div>
+            </div>
+        `;
+        
+        elements.badgesContainer.appendChild(badgeElement);
+    });
     
-    elements.badgesContainer.appendChild(exampleBadge);
-} 
+    console.log(`${elements.badgesContainer.childElementCount} badges rendus`);
+}
+
+function updateDate() {
+    const currentDateEl = document.getElementById('current-date');
+    if (currentDateEl) {
+        const today = new Date();
+        currentDateEl.textContent = formatDate(today);
+    }
+}
+
+// Fonction pour tester sans Supabase
+window.forceDisplayApp = function() {
+    console.log("Forçage de l'affichage de l'application pour les tests");
+    
+    // Forcer l'initialisation des objectifs
+    initializeDefaultObjectives();
+    console.log("Objectifs forcés:", objectives);
+    
+    // Afficher l'application et masquer l'authentification
+    document.querySelector('.app-container').style.display = 'flex';
+    document.getElementById('auth-container').style.display = 'none';
+    
+    // Initialiser l'application
+    initApp();
+    
+    // Afficher les objectifs dans la console
+    console.log("OBJECTIFS PERSONNELS:", objectives.personal);
+    console.log("OBJECTIFS PROFESSIONNELS:", objectives.professional);
+    
+    // Afficher les objectifs dans le débugger
+    const debugElement = document.getElementById('debug-info');
+    if (debugElement) {
+        debugElement.style.display = 'block';
+        debugElement.textContent = `Objectifs personnels: ${objectives.personal.length}, Objectifs pro: ${objectives.professional.length}`;
+    }
+    
+    // Forcer le rendu des vues
+    renderDailyInputs();
+    
+    return "Application affichée en mode test";
+};
+
+// Appeler automatiquement la fonction pour le test sans afficher le bouton
+setTimeout(() => {
+    window.forceDisplayApp();
+}, 1000);
+
+/* 
+// Ajouter un bouton de test - COMMENTÉ POUR LA PRODUCTION
+document.addEventListener('DOMContentLoaded', () => {
+    const testButton = document.createElement('button');
+    testButton.textContent = "FORCE DISPLAY";
+    testButton.style.position = "fixed";
+    testButton.style.bottom = "10px";
+    testButton.style.right = "10px";
+    testButton.style.zIndex = "9999";
+    testButton.addEventListener('click', window.forceDisplayApp);
+    document.body.appendChild(testButton);
+});
+*/ 
