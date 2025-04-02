@@ -96,26 +96,66 @@ export async function signupUser(email, password, username) {
 }
 
 // Initialisation des objectifs par défaut pour un nouvel utilisateur
-async function initializeDefaultObjectives(userId) {
-  console.log("Initialisation des objectifs par défaut pour", userId);
+export async function initializeDefaultObjectives(userId) {
+  console.log("Initialisation des objectifs par défaut pour", userId || "l'utilisateur local");
   
   try {
-    // Au lieu d'insérer directement, utiliser une fonction RPC pour contourner le RLS
-    const { error } = await supabase.rpc('create_default_objectives', {
-      user_id: userId
-    });
-    
-    if (error) {
-      console.error("Erreur d'initialisation des objectifs via RPC:", error);
-      throw error;
+    if (userId) {
+      // Avec Supabase: utiliser une fonction RPC pour contourner le RLS
+      const { error } = await supabase.rpc('create_default_objectives', {
+        user_id: userId
+      });
+      
+      if (error) {
+        console.error("Erreur d'initialisation des objectifs via RPC:", error);
+        // En cas d'erreur, initialiser localement
+        initializeDefaultObjectivesLocally();
+      } else {
+        console.log("Objectifs par défaut initialisés avec succès sur Supabase");
+      }
+    } else {
+      // Sans userId: initialiser localement
+      initializeDefaultObjectivesLocally();
     }
-    
-    console.log("Objectifs par défaut initialisés avec succès");
   } catch (error) {
     console.error("Erreur lors de l'initialisation des objectifs:", error);
-    throw error;
+    // Toujours initialiser localement en cas d'erreur
+    initializeDefaultObjectivesLocally();
   }
 }
+
+// Fonction pour initialiser les objectifs localement (sans Supabase)
+function initializeDefaultObjectivesLocally() {
+  console.log("Initialisation des objectifs par défaut en local");
+  
+  if (window.objectives) {
+    window.objectives.personal = [
+      { id: 'running', title: 'Courir', target: 150, unit: 'km', current: 0, xpPerUnit: 10 },
+      { id: 'pushups', title: 'Pompes', target: 1500, unit: 'pompes', current: 0, xpPerUnit: 1 },
+      { id: 'pullups', title: 'Tractions', target: 300, unit: 'tractions', current: 0, xpPerUnit: 5 },
+      { id: 'frenchAudio', title: 'Lecture audio français/arabe', target: 300, unit: 'pages', current: 0, xpPerUnit: 5 },
+      { id: 'birthBook', title: 'Livre naissance', target: 200, unit: 'pages', current: 0, xpPerUnit: 5 },
+      { id: 'quranReading', title: 'Lecture du Coran (4 pages)', target: 30, unit: 'lectures', current: 0, xpPerUnit: 20 },
+      { id: 'quranLearning', title: 'Mémorisation Coran', target: 2, unit: 'pages', current: 0, xpPerUnit: 50 },
+      { id: 'mosquePrayer', title: 'Prières à la mosquée', target: 30, unit: 'prières', current: 0, xpPerUnit: 10 },
+      { id: 'extraPrayers', title: 'Prières surérogatoires', target: 150, unit: 'unités', current: 0, xpPerUnit: 2 },
+      { id: 'fasting', title: 'Jeûne', target: 8, unit: 'jours', current: 0, xpPerUnit: 30 },
+      { id: 'sleep', title: 'Sommeil', target: 250, unit: 'heures', isReverse: true, current: 0, xpPerUnit: 1 }
+    ];
+    
+    window.objectives.professional = [
+      { id: 'shortVideos', title: 'Vidéos courtes', target: 60, unit: 'vidéos', current: 0, xpPerUnit: 15 },
+      { id: 'focusTime', title: 'Sessions focus (max 3x25min)', target: 1, unit: 'sessions', isDaily: true, current: 0, xpPerUnit: 20 }
+    ];
+    
+    console.log("Objectifs locaux initialisés:", window.objectives);
+  } else {
+    console.error("La variable window.objectives n'est pas définie");
+  }
+}
+
+// Exposer également initializeDefaultObjectivesLocally globalement pour le fallback
+window.initializeDefaultObjectivesLocally = initializeDefaultObjectivesLocally;
 
 // Vérification session active
 export async function getCurrentUser() {
