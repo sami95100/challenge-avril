@@ -122,9 +122,17 @@ export async function getCurrentUser() {
   console.log("Vérification de l'utilisateur actuellement connecté");
   
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log("Utilisateur actuel:", user);
-    return user;
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Ne retourner l'utilisateur que si une session existe réellement
+    if (session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Utilisateur actuel:", user);
+      return user;
+    } else {
+      console.log("Aucune session active trouvée");
+      return null;
+    }
   } catch (error) {
     console.error("Erreur lors de la vérification de l'utilisateur:", error);
     return null;

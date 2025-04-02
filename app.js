@@ -1413,9 +1413,9 @@ function updateDate() {
 window.forceDisplayApp = function() {
     console.log("Forçage de l'affichage de l'application pour les tests");
     
-    // Forcer l'initialisation des objectifs
-    initializeDefaultObjectives();
-    console.log("Objectifs forcés:", objectives);
+    // Commenté pour éviter la connexion automatique
+    // initializeDefaultObjectives();
+    // console.log("Objectifs forcés:", objectives);
     
     // Afficher l'application et masquer l'authentification
     document.querySelector('.app-container').style.display = 'flex';
@@ -1441,21 +1441,7 @@ window.forceDisplayApp = function() {
     return "Application affichée en mode test";
 };
 
-// Appeler automatiquement la fonction pour le test sans afficher le bouton
-setTimeout(() => {
-    window.forceDisplayApp();
-}, 1000);
-
-/* 
-// Ajouter un bouton de test - COMMENTÉ POUR LA PRODUCTION
-document.addEventListener('DOMContentLoaded', () => {
-    const testButton = document.createElement('button');
-    testButton.textContent = "FORCE DISPLAY";
-    testButton.style.position = "fixed";
-    testButton.style.bottom = "10px";
-    testButton.style.right = "10px";
-    testButton.style.zIndex = "9999";
-    testButton.addEventListener('click', window.forceDisplayApp);
-    document.body.appendChild(testButton);
-});
-*/ 
+// Commenté pour ne pas forcer l'affichage automatiquement
+// setTimeout(() => {
+//    window.forceDisplayApp();
+// }, 1000); 
