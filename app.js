@@ -693,6 +693,16 @@ function setupAuthEvents() {
         document.getElementById('signup-error').textContent = '';
     });
     
+    // Mode hors ligne
+    const offlineBtn = document.getElementById('offline-mode-btn');
+    if (offlineBtn) {
+        offlineBtn.addEventListener('click', () => {
+            console.log("Mode hors ligne activé");
+            // Forcer l'initialisation locale des objectifs
+            window.forceDisplayApp();
+        });
+    }
+    
     // Connexion
     document.getElementById('login-submit').addEventListener('click', async () => {
         const email = document.getElementById('login-email').value;
@@ -701,9 +711,11 @@ function setupAuthEvents() {
         
         // Réinitialiser le message d'erreur
         errorElement.textContent = '';
+        errorElement.style.display = 'none';
         
         if (!email || !password) {
             errorElement.textContent = "Veuillez remplir tous les champs";
+            errorElement.style.display = 'block';
             return;
         }
         
@@ -741,6 +753,7 @@ function setupAuthEvents() {
         } catch (error) {
             console.error("Erreur de connexion:", error);
             errorElement.textContent = `Erreur de connexion: ${error.message || "Vérifiez vos identifiants"}`;
+            errorElement.style.display = 'block';
         } finally {
             hideLoadingIndicator();
         }
@@ -1474,6 +1487,7 @@ window.forceDisplayApp = function() {
 };
 
 // Appeler automatiquement la fonction en cas d'erreur
-setTimeout(() => {
-    window.forceDisplayApp();
-}, 2000); 
+// Ne plus appeler automatiquement - nécessite une action utilisateur
+// setTimeout(() => {
+//    window.forceDisplayApp();
+// }, 2000); 

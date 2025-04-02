@@ -33,7 +33,7 @@
                     <label for="login-password">Mot de passe</label>
                     <input type="password" id="login-password" placeholder="••••••••" required>
                 </div>
-                <div id="login-error" class="error-message"></div>
+                <div id="login-error" class="error-message" style="display: none;"></div>
                 <button type="button" id="login-submit" class="auth-button">Se connecter</button>
                 <p class="auth-switch">Pas encore de compte? <a href="#" id="show-signup">Créer un compte</a></p>
             </form>
@@ -55,6 +55,13 @@
                 <button type="button" id="signup-submit" class="auth-button">Créer un compte</button>
                 <p class="auth-switch">Déjà un compte? <a href="#" id="show-login">Se connecter</a></p>
             </form>
+            
+            <!-- Bouton de mode hors ligne -->
+            <div class="offline-option" style="margin-top: 20px; text-align: center;">
+                <button id="offline-mode-btn" style="background: #333; color: #999; border: 1px solid #666; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+                    Mode hors ligne (sans compte)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -170,10 +177,28 @@
     <script type="module" src="supabase.js"></script>
     <script type="module" src="app.js"></script>
 
-    <!-- Script pour activer la console de débogage -->
+    <!-- Script pour activer la console de débogage et désactiver l'auto-connexion -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Activer la console de débogage en appuyant 5 fois sur le titre de l'application
+        // 1. Désactiver l'auto-connexion
+        if (window.forceDisplayApp) {
+            console.log("Mode automatique désactivé - utilisation du bouton hors ligne");
+            // Remplacer par une version qui ne s'exécute que sur commande
+            const originalFn = window.forceDisplayApp;
+            window.forceDisplayApp = function() {
+                console.log("Mode hors ligne activé manuellement");
+                return originalFn.apply(this, arguments);
+            };
+        }
+        
+        // 2. Supprimer/masquer les messages d'erreur au démarrage
+        const errorElements = document.querySelectorAll('.error-message');
+        errorElements.forEach(el => {
+            el.style.display = 'none';
+            el.textContent = '';
+        });
+        
+        // 3. Activer la console de débogage en appuyant 5 fois sur le titre de l'application
         let tapCount = 0;
         document.querySelector('.app-title').addEventListener('click', function() {
             tapCount++;
