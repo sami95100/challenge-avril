@@ -131,7 +131,10 @@
             </div>
         </div>
         
-        <button id="logout-btn" class="logout-btn">Se déconnecter</button>
+        <button id="logout-btn" class="logout-btn">
+            Se déconnecter
+            <span class="tooltip">Si vous rencontrez des problèmes, utilisez la <a href="?logout=true">déconnexion forcée</a></span>
+        </button>
     </div>
 
     <div id="level-up-modal" class="modal">
@@ -180,7 +183,77 @@
     <!-- Script pour activer la console de débogage et désactiver l'auto-connexion -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 1. Désactiver l'auto-connexion
+        // 0. Forcer la déconnexion si paramètre dans l'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceLogout = urlParams.get('logout');
+        
+        if (forceLogout === 'true') {
+            console.log("Déconnexion forcée demandée par l'URL");
+            
+            // Supprimer toutes les clés Supabase du localStorage
+            let hasClearedKeys = false;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (
+                    key.includes('supabase') || 
+                    key.includes('sb-') || 
+                    key.includes('supa') ||
+                    key === 'challengeAvrilAppState'
+                )) {
+                    console.log("Suppression forcée de la clé:", key);
+                    localStorage.removeItem(key);
+                    hasClearedKeys = true;
+                    i--; // Ajuster l'index car la liste a été modifiée
+                }
+            }
+            
+            if (hasClearedKeys) {
+                // Afficher un message à l'utilisateur
+                const message = document.createElement('div');
+                message.style.position = 'fixed';
+                message.style.top = '50%';
+                message.style.left = '50%';
+                message.style.transform = 'translate(-50%, -50%)';
+                message.style.background = 'rgba(0,0,0,0.8)';
+                message.style.color = '#fff';
+                message.style.padding = '20px';
+                message.style.borderRadius = '10px';
+                message.style.zIndex = '9999';
+                message.style.textAlign = 'center';
+                message.style.fontFamily = 'var(--body-font)';
+                message.innerHTML = '<h3>Déconnexion forcée réussie</h3><p>Vous allez être redirigé vers la page d\'accueil.</p>';
+                document.body.appendChild(message);
+                
+                // Rediriger vers la page sans paramètre après 2 secondes
+                setTimeout(function() {
+                    window.location.href = window.location.pathname;
+                }, 2000);
+            } else {
+                // Rediriger vers la page sans paramètre immédiatement
+                window.location.href = window.location.pathname;
+            }
+            return; // Arrêter l'exécution du reste du script
+        }
+        
+        // 1. Vérifier si plusieurs instances d'authentification sont présentes
+        const authKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.includes('auth-token')) {
+                authKeys.push(key);
+            }
+        }
+        
+        if (authKeys.length > 1) {
+            console.warn("Plusieurs jetons d'authentification détectés:", authKeys);
+            // Garder seulement le plus récent (si possible) ou tout nettoyer
+            authKeys.slice(0, -1).forEach(key => {
+                console.log("Suppression du jeton supplémentaire:", key);
+                localStorage.removeItem(key);
+            });
+        }
+        
+        // 2. Désactiver l'auto-connexion
         if (window.forceDisplayApp) {
             console.log("Mode automatique désactivé - utilisation du bouton hors ligne");
             // Remplacer par une version qui ne s'exécute que sur commande
@@ -191,14 +264,14 @@
             };
         }
         
-        // 2. Supprimer/masquer les messages d'erreur au démarrage
+        // 3. Supprimer/masquer les messages d'erreur au démarrage
         const errorElements = document.querySelectorAll('.error-message');
         errorElements.forEach(el => {
             el.style.display = 'none';
             el.textContent = '';
         });
         
-        // 3. Activer la console de débogage en appuyant 5 fois sur le titre de l'application
+        // 4. Activer la console de débogage en appuyant 5 fois sur le titre de l'application
         let tapCount = 0;
         document.querySelector('.app-title').addEventListener('click', function() {
             tapCount++;
@@ -213,6 +286,20 @@
                 } else {
                     objectivesDebug.textContent = "La variable 'objectives' n'est pas définie";
                 }
+                
+                // Ajouter un bouton de déconnexion forcée à la console de débogage
+                const logoutBtn = document.createElement('button');
+                logoutBtn.textContent = "Forcer la déconnexion";
+                logoutBtn.style.marginTop = "5px";
+                logoutBtn.style.padding = "2px 5px";
+                logoutBtn.style.backgroundColor = "#300";
+                logoutBtn.style.color = "#f00";
+                logoutBtn.style.border = "1px solid #f00";
+                logoutBtn.addEventListener('click', function() {
+                    window.location.href = "?logout=true";
+                });
+                objectivesDebug.appendChild(document.createElement('br'));
+                objectivesDebug.appendChild(logoutBtn);
                 
                 tapCount = 0;
             }

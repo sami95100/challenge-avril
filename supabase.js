@@ -162,27 +162,92 @@ export async function getCurrentUser() {
   console.log("Vérification de l'utilisateur actuellement connecté");
   
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    // 1. Vérifier si une session existe réellement
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    // Ne retourner l'utilisateur que si une session existe réellement
-    if (session) {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("Utilisateur actuel:", user);
-      return user;
-    } else {
+    if (sessionError) {
+      console.error("Erreur lors de la vérification de la session:", sessionError);
+      return null;
+    }
+    
+    if (!session) {
       console.log("Aucune session active trouvée");
       return null;
     }
+    
+    // 2. Vérifier que l'utilisateur est valide
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error("Erreur lors de la récupération de l'utilisateur:", userError);
+      return null;
+    }
+    
+    if (!user || !user.id) {
+      console.log("Session trouvée mais utilisateur invalide");
+      return null;
+    }
+    
+    // 3. Double vérification que l'utilisateur peut accéder aux données (optionnel)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .eq('id', user.id)
+      .single();
+      
+    if (profileError || !profile) {
+      console.warn("Utilisateur authentifié mais profil inaccessible, possible problème d'autorisation");
+      // On continue quand même car le profil pourrait ne pas exister pour un nouvel utilisateur
+    } else {
+      console.log("Profil vérifié:", profile.username);
+    }
+    
+    console.log("Utilisateur actuel confirmé:", user.email);
+    return user;
   } catch (error) {
-    console.error("Erreur lors de la vérification de l'utilisateur:", error);
+    console.error("Erreur globale lors de la vérification de l'utilisateur:", error);
     return null;
   }
 }
 
 // Déconnexion
 export async function logoutUser() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  console.log("Déconnexion de l'utilisateur...");
+  
+  try {
+    // D'abord, déconnexion via l'API Supabase
+    const { error } = await supabase.auth.signOut({
+      scope: 'global' // Déconnecter de tous les appareils
+    });
+    
+    if (error) {
+      console.error("Erreur lors de la déconnexion Supabase:", error);
+      throw error;
+    }
+    
+    // Ensuite, supprimer manuellement toutes les clés de session dans le localStorage
+    // pour s'assurer que la session est complètement effacée
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('sb-'))) {
+        console.log("Suppression de la clé de session:", key);
+        localStorage.removeItem(key);
+      }
+    }
+    
+    console.log("Déconnexion réussie, toutes les données de session ont été effacées");
+    return true;
+  } catch (error) {
+    console.error("Erreur critique lors de la déconnexion:", error);
+    // Même en cas d'erreur, tenter de nettoyer le localStorage
+    try {
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('supabase.auth.refreshToken');
+    } catch (e) {
+      console.error("Impossible de nettoyer le localStorage:", e);
+    }
+    throw error;
+  }
 }
 
 // Chargement des données utilisateur

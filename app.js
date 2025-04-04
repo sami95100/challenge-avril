@@ -50,7 +50,7 @@ const badges = [
     { id: 'contentCreator', title: 'Créateur de contenu', icon: '📱', description: '30 vidéos créées', condition: stats => getObjectiveProgress('shortVideos') >= 30 }
 ];
 
-// État de l'application
+// Variables globales pour l'état de l'application
 let appState = {
     xp: 0,
     level: 1,
@@ -65,21 +65,57 @@ let appState = {
     objectiveStreaks: {},
     lastMissedDay: {}
 };
+let formattedDate = '';
+let currentTab = 'daily'; // default tab
+let currentDate = new Date().toISOString().split('T')[0];
+let isYesterday = false;
+let objectives = { personal: [], professional: [] };
 
-// Éléments DOM
-const elements = {
+// Éléments DOM - référencés dans une seule collection pour meilleure organisation
+let elements = {
+    // Conteneurs principaux
+    authContainer: document.getElementById('auth-container'),
+    appContainer: document.getElementById('app-container'),
+    
+    // Formulaires d'authentification
+    loginForm: document.getElementById('login-form'),
+    signupForm: document.getElementById('signup-form'),
+    loginError: document.getElementById('login-error'),
+    signupError: document.getElementById('signup-error'),
+    loginLink: document.getElementById('login-link'),
+    signupLink: document.getElementById('signup-link'),
+    offlineButton: document.getElementById('offline-button'),
+    
+    // Gestion des erreurs
+    errorContainer: document.getElementById('error-container'),
+    errorMessage: document.getElementById('error-message'),
+    
     // Onglets et conteneurs principaux
     dailyTab: document.getElementById('daily-tab'),
     progressTab: document.getElementById('progress-tab'),
     statsTab: document.getElementById('stats-tab'),
+    
+    // Contenus des onglets
+    dailyContent: document.getElementById('daily-content'),
+    progressContent: document.getElementById('progress-content'),
+    statsContent: document.getElementById('stats-content'),
+    
+    // Sélecteur de date et entrées quotidiennes
+    dateSelector: document.getElementById('date-selector'),
+    dailyInputs: document.getElementById('daily-inputs'),
+    infoText: document.getElementById('info-text'),
+    totalContainer: document.getElementById('total-container'),
+    
+    // Éléments de navigation et d'état
+    logoutButton: document.getElementById('logout-button'),
+    loadingMessage: document.getElementById('loading-message'),
     
     // Boutons d'onglets
     tabDaily: document.getElementById('tab-daily'),
     tabProgress: document.getElementById('tab-progress'),
     tabStats: document.getElementById('tab-stats'),
     
-    // Conteneurs pour les entrées et les objectifs
-    dailyInputs: document.getElementById('daily-inputs'),
+    // Conteneurs de statistiques
     progressContainer: document.getElementById('progress-container'),
     statsContainer: document.getElementById('stats-container'),
     
@@ -87,7 +123,7 @@ const elements = {
     categoryBtnPersonal: document.getElementById('category-btn-personal'),
     categoryBtnProfessional: document.getElementById('category-btn-professional'),
     
-    // Autres éléments
+    // Autres éléments d'UI
     saveButton: document.createElement('button'),
     currentDate: document.getElementById('current-date'),
     currentLevel: document.getElementById('current-level'),
@@ -564,14 +600,48 @@ function setupEventListeners() {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("Initialisation de l'application");
     
-    // Forcer l'initialisation des objectifs par défaut dès le démarrage
-    initializeDefaultObjectives();
-    console.log("Initialisation des objectifs par défaut...");
-    console.log("Objectifs personnels:", objectives.personal.length);
-    console.log("Objectifs professionnels:", objectives.professional.length);
+    // Bloquer délibérément tout essai de connexion automatique pendant 2 secondes
+    // pour permettre à l'utilisateur de voir l'écran de connexion
+    const blockAutoLogin = true;
+    
+    // Configuration du bouton de déconnexion
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                console.log("Tentative de déconnexion...");
+                showLoadingIndicator();
+                await logoutUser();
+                
+                // Forcer la suppression des objectifs et de l'état
+                window.objectives = {
+                    personal: [],
+                    professional: []
+                };
+                
+                // Réinitialiser l'état de l'application
+                appState = {...defaultAppState};
+                
+                // Masquer l'application et afficher l'écran d'authentification
+                document.querySelector('.app-container').style.display = 'none';
+                document.getElementById('auth-container').style.display = 'flex';
+                
+                console.log("Déconnexion réussie");
+            } catch (error) {
+                console.error("Erreur lors de la déconnexion:", error);
+            } finally {
+                hideLoadingIndicator();
+            }
+        });
+    }
     
     // Vérifier si l'utilisateur est déjà connecté
     try {
+        if (blockAutoLogin) {
+            // Attendre 2 secondes avant de vérifier la session
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
         const user = await getCurrentUser();
         console.log("User status:", user ? "Connecté" : "Non connecté", user);
         
@@ -816,8 +886,9 @@ function setupAuthEvents() {
     // Déconnexion
     document.getElementById('logout-btn').addEventListener('click', async () => {
         try {
-            await logoutUser();
-            showAuthScreen();
+            // Blocage de cette fonction - le gestionnaire est défini dans DOMContentLoaded
+            console.log("Ce gestionnaire d'événement est obsolète et ne devrait pas être appelé");
+            // Le code de déconnexion a été déplacé dans le gestionnaire défini dans DOMContentLoaded
         } catch (error) {
             console.error("Erreur de déconnexion:", error);
             alert(`Erreur de déconnexion: ${error.message}`);
