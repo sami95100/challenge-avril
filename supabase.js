@@ -214,8 +214,28 @@ export async function getCurrentUser() {
 export async function logoutUser() {
   console.log("Déconnexion de l'utilisateur...");
   
+  // Nettoyer d'abord les clés du localStorage pour éviter les problèmes de reconnexion
   try {
-    // D'abord, déconnexion via l'API Supabase
+    // Supprimer toutes les clés relatives à Supabase
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.includes('supabase') || 
+        key.includes('sb-') || 
+        key.includes('supa')
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Supprimer les clés trouvées
+    keysToRemove.forEach(key => {
+      console.log("Suppression de la clé de session:", key);
+      localStorage.removeItem(key);
+    });
+    
+    // Ensuite, déconnexion via l'API Supabase
     const { error } = await supabase.auth.signOut({
       scope: 'global' // Déconnecter de tous les appareils
     });
@@ -225,27 +245,34 @@ export async function logoutUser() {
       throw error;
     }
     
-    // Ensuite, supprimer manuellement toutes les clés de session dans le localStorage
-    // pour s'assurer que la session est complètement effacée
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes('supabase') || key.includes('sb-'))) {
-        console.log("Suppression de la clé de session:", key);
-        localStorage.removeItem(key);
-      }
+    // Supprimer enfin l'état de l'application
+    localStorage.removeItem('challengeAvrilAppState');
+    
+    // Vider les variables globales
+    if (window.objectives) {
+      window.objectives = {
+        personal: [],
+        professional: []
+      };
     }
+    
+    // Forcer un rechargement dans 500ms pour s'assurer que tout est nettoyé
+    setTimeout(() => {
+      console.log("Rechargement forcé pour finaliser la déconnexion");
+      window.location.reload();
+    }, 500);
     
     console.log("Déconnexion réussie, toutes les données de session ont été effacées");
     return true;
   } catch (error) {
     console.error("Erreur critique lors de la déconnexion:", error);
-    // Même en cas d'erreur, tenter de nettoyer le localStorage
-    try {
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('supabase.auth.refreshToken');
-    } catch (e) {
-      console.error("Impossible de nettoyer le localStorage:", e);
-    }
+    // Même en cas d'erreur, nettoyer le localStorage
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('supabase.auth.refreshToken');
+    localStorage.removeItem('sb-mpeleexbatcsknosekap-auth-token');
+    
+    // Forcer un rechargement pour réinitialiser l'état
+    window.location.reload();
     throw error;
   }
 }
