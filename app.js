@@ -3,6 +3,19 @@ console.log("APP.JS CHARGÉ");
 // Import des fonctions Supabase
 import { supabase, getCurrentUser, loginUser, signupUser, logoutUser, loadUserData, saveUserProgress } from './supabase.js';
 
+// Vérifier immédiatement si un utilisateur est connecté
+console.log("Vérification de l'utilisateur connecté...");
+getCurrentUser().then(user => {
+    if (user) {
+        console.log("Utilisateur connecté:", user.email);
+        // On laissera le reste du script gérer l'initialisation
+    } else {
+        console.log("Aucun utilisateur connecté");
+    }
+}).catch(error => {
+    console.error("Erreur lors de la vérification de l'utilisateur:", error);
+});
+
 // Définition des objectifs (sera remplacée par les données de Supabase après connexion)
 // Rendre les objectifs accessibles globalement
 window.objectives = {
@@ -69,7 +82,6 @@ let formattedDate = '';
 let currentTab = 'daily'; // default tab
 let currentDate = new Date().toISOString().split('T')[0];
 let isYesterday = false;
-let objectives = { personal: [], professional: [] };
 
 // Éléments DOM - référencés dans une seule collection pour meilleure organisation
 let elements = {

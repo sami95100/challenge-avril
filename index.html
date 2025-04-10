@@ -55,13 +55,6 @@
                 <button type="button" id="signup-submit" class="auth-button">Créer un compte</button>
                 <p class="auth-switch">Déjà un compte? <a href="#" id="show-login">Se connecter</a></p>
             </form>
-            
-            <!-- Bouton de mode hors ligne -->
-            <div class="offline-option" style="margin-top: 20px; text-align: center;">
-                <button id="offline-mode-btn" style="background: #333; color: #999; border: 1px solid #666; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
-                    Mode hors ligne (sans compte)
-                </button>
-            </div>
         </div>
     </div>
 
@@ -151,10 +144,21 @@
         <div id="objectives-debug">Chargement des objectifs...</div>
     </div>
 
-    <!-- Import de la bibliothèque Supabase - assurez-vous qu'elle est chargée en premier et non en module -->
+    <!-- Import de la bibliothèque Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Script de débogage pour les appareils mobiles -->
+    <!-- Initialisation globale de Supabase -->
+    <script>
+        // Initialiser le client Supabase pour un usage global
+        const SUPABASE_URL = 'https://mpeleexbatcsknosekap.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wZWxlZXhiYXRjc2tub3Nla2FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1NDE0MjksImV4cCI6MjA1OTExNzQyOX0.0PIC0MifqMwSN5ah4zvAHmwtiN1rVYcGcOtzho95fuE';
+        
+        // Créer une instance globale de Supabase
+        window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log("Client Supabase initialisé globalement");
+    </script>
+    
+    <!-- Script de débogage pour les appareils mobiles - non module -->
     <script>
         // Fonction pour afficher les erreurs de console sur mobile
         window.onerror = function(message, source, lineno, colno, error) {
@@ -181,7 +185,7 @@
     <script type="module" src="app.js"></script>
 
     <!-- Script pour activer la console de débogage et désactiver l'auto-connexion -->
-    <script>
+    <script type="module">
     document.addEventListener('DOMContentLoaded', function() {
         // 0. Forcer la déconnexion si paramètre dans l'URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -253,17 +257,6 @@
             });
         }
         
-        // 2. Désactiver l'auto-connexion
-        if (window.forceDisplayApp) {
-            console.log("Mode automatique désactivé - utilisation du bouton hors ligne");
-            // Remplacer par une version qui ne s'exécute que sur commande
-            const originalFn = window.forceDisplayApp;
-            window.forceDisplayApp = function() {
-                console.log("Mode hors ligne activé manuellement");
-                return originalFn.apply(this, arguments);
-            };
-        }
-        
         // 3. Supprimer/masquer les messages d'erreur au démarrage
         const errorElements = document.querySelectorAll('.error-message');
         errorElements.forEach(el => {
@@ -305,6 +298,71 @@
             }
         });
     });
+    </script>
+    
+    <!-- Script de débogage pour le bouton de connexion -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Configuration du débogage du bouton de connexion");
+            
+            // Vérifier si les éléments existent
+            const loginBtn = document.getElementById('login-submit');
+            const signupBtn = document.getElementById('signup-submit');
+            
+            if (loginBtn) {
+                console.log("Bouton de connexion trouvé, ajout d'un gestionnaire d'événements");
+                
+                // Ajouter un gestionnaire d'événements de secours
+                loginBtn.addEventListener('click', function() {
+                    console.log("Clic sur le bouton de connexion");
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-password').value;
+                    const errorDiv = document.getElementById('login-error');
+                    
+                    if (!email || !password) {
+                        errorDiv.textContent = 'Veuillez remplir tous les champs';
+                        errorDiv.style.display = 'block';
+                        return;
+                    }
+                    
+                    errorDiv.textContent = 'Tentative de connexion...';
+                    errorDiv.style.display = 'block';
+                    
+                    // Tenter la connexion directement (sans modules)
+                    if (window.supabase) {
+                        window.supabase.auth.signInWithPassword({ email, password })
+                            .then(({ data, error }) => {
+                                if (error) {
+                                    console.error('Erreur de connexion:', error);
+                                    errorDiv.textContent = error.message || 'Erreur de connexion';
+                                    errorDiv.style.display = 'block';
+                                } else {
+                                    console.log('Connexion réussie');
+                                    errorDiv.textContent = 'Connexion réussie';
+                                    errorDiv.style.display = 'block';
+                                    errorDiv.style.color = 'green';
+                                    
+                                    // Recharger la page après 1 seconde
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1000);
+                                }
+                            });
+                    } else {
+                        errorDiv.textContent = 'Erreur: Supabase non disponible';
+                        errorDiv.style.display = 'block';
+                    }
+                });
+            } else {
+                console.error("Bouton de connexion non trouvé");
+            }
+            
+            if (signupBtn) {
+                console.log("Bouton d'inscription trouvé");
+            } else {
+                console.error("Bouton d'inscription non trouvé");
+            }
+        });
     </script>
 </body>
 </html> 
