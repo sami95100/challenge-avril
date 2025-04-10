@@ -1104,4 +1104,190 @@ main {
 .offline-btn:hover {
     background: #444;
     color: #ccc;
+}
+
+/* Styles pour l'interface Trello */
+.objectives-trello-board {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 15px 0;
+    overflow-x: auto;
+    min-height: 300px;
+}
+
+.board-column {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    min-width: 300px;
+    max-width: 100%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.column-header {
+    padding: 15px;
+    border-bottom: 1px solid #444;
+}
+
+.column-header h3 {
+    margin: 0;
+    font-size: 1.1em;
+    color: #f0f0f0;
+}
+
+.column-content {
+    padding: 10px;
+    flex: 1;
+    min-height: 200px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.objective-card {
+    background-color: #333;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.objective-card:hover {
+    background-color: #3a3a3a;
+    transform: translateY(-2px);
+}
+
+.objective-card .card-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #fff;
+}
+
+.objective-card .card-details {
+    font-size: 0.9em;
+    color: #bbb;
+}
+
+.objective-card .card-progress {
+    margin-top: 8px;
+    height: 6px;
+    background-color: #444;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.objective-card .progress-value {
+    height: 100%;
+    background-color: #3498db;
+}
+
+.add-card-btn {
+    background-color: transparent;
+    border: none;
+    color: #999;
+    padding: 12px;
+    text-align: left;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    width: 100%;
+    border-radius: 0 0 8px 8px;
+}
+
+.add-card-btn:hover {
+    background-color: #333;
+    color: #fff;
+}
+
+/* Styles pour la modale d'ajout/édition d'objectif */
+#objective-modal .modal-content {
+    max-width: 500px;
+    padding: 25px;
+}
+
+#objective-form .form-group {
+    margin-bottom: 15px;
+}
+
+#objective-form label {
+    display: block;
+    margin-bottom: 5px;
+    color: #ddd;
+}
+
+#objective-form input[type="text"],
+#objective-form input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: #fff;
+}
+
+#objective-form .checkbox-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+#objective-form .checkbox-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+#objective-form .form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#objective-form .save-btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#objective-form .delete-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.objective-tag {
+    display: inline-block;
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-right: 5px;
+    background-color: #3498db;
+    color: white;
+}
+
+.objective-tag.daily {
+    background-color: #9b59b6;
+}
+
+.objective-tag.reverse {
+    background-color: #e67e22;
+}
+
+/* Style du message d'erreur pour la sauvegarde des données */
+.error-message {
+    color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.1);
+    border: 1px solid #e74c3c;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 0.9em;
 } 

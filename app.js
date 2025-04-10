@@ -1,7 +1,7 @@
 console.log("APP.JS CHARGÉ");
 
 // Import des fonctions Supabase
-import { supabase, getCurrentUser, loginUser, signupUser, logoutUser, loadUserData, saveUserProgress } from './supabase.js';
+import { supabase, getCurrentUser, loginUser, signupUser, logoutUser, loadUserData, saveUserProgress, createNewObjective, deleteObjective } from './supabase.js';
 
 // Vérifier immédiatement si un utilisateur est connecté
 console.log("Vérification de l'utilisateur connecté...");
@@ -1224,6 +1224,9 @@ function initApp() {
         });
     });
     
+    // Configuration des boutons pour l'onglet Objectifs
+    setupObjectivesTabEvents();
+    
     // Configuration du bouton de fermeture de la modal
     const closeModal = document.getElementById('close-modal');
     if (closeModal) {
@@ -1461,6 +1464,9 @@ function switchTab(tabId) {
     } else if (tabId === 'stats') {
         console.log("Rendu des statistiques pour l'onglet 'stats'");
         renderStats();
+    } else if (tabId === 'objectives') {
+        console.log("Rendu des objectifs pour l'onglet 'objectives'");
+        renderObjectivesTab();
     }
 }
 
@@ -1574,3 +1580,340 @@ window.forceDisplayApp = function() {
 // setTimeout(() => {
 //    window.forceDisplayApp();
 // }, 2000); 
+
+function setupObjectivesTabEvents() {
+    // Configurer les boutons de catégorie pour les objectifs
+    const objectivesCategoryButtons = document.querySelectorAll('[id^="objectives-category-btn-"]');
+    objectivesCategoryButtons.forEach(button => {
+        const category = button.getAttribute('data-category');
+        button.addEventListener('click', () => {
+            // Désactiver tous les boutons
+            objectivesCategoryButtons.forEach(btn => btn.classList.remove('active'));
+            // Activer le bouton sélectionné
+            button.classList.add('active');
+            // Mettre à jour l'affichage des objectifs
+            document.getElementById('objective-category').value = category;
+            renderObjectivesTab();
+        });
+    });
+    
+    // Configuration du bouton d'ajout d'objectif
+    const addObjectiveBtn = document.getElementById('add-objective-btn');
+    if (addObjectiveBtn) {
+        addObjectiveBtn.addEventListener('click', () => {
+            // Réinitialiser le formulaire
+            const form = document.getElementById('objective-form');
+            form.reset();
+            
+            // Cacher le bouton de suppression pour un nouvel objectif
+            document.getElementById('delete-objective-btn').style.display = 'none';
+            
+            // Définir la catégorie active
+            const activeCategory = document.querySelector('#objectives-tab .category-btn.active');
+            if (activeCategory) {
+                document.getElementById('objective-category').value = activeCategory.getAttribute('data-category');
+            }
+            
+            // Afficher la modale
+            document.getElementById('objective-modal').style.display = 'flex';
+            document.getElementById('objective-modal-title').textContent = 'Nouvel Objectif';
+            document.getElementById('objective-id').value = '';
+        });
+    }
+    
+    // Configuration de la fermeture de la modale
+    const closeModalBtns = document.querySelectorAll('#objective-modal .close-modal');
+    closeModalBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('objective-modal').style.display = 'none';
+        });
+    });
+    
+    // Configuration du formulaire d'objectif
+    const objectiveForm = document.getElementById('objective-form');
+    if (objectiveForm) {
+        objectiveForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                // Récupérer les valeurs du formulaire
+                const objectiveData = {
+                    id: document.getElementById('objective-id').value || null,
+                    title: document.getElementById('objective-title').value,
+                    target: parseInt(document.getElementById('objective-target').value),
+                    unit: document.getElementById('objective-unit').value,
+                    xpPerUnit: parseInt(document.getElementById('objective-xp').value),
+                    isDaily: document.getElementById('objective-is-daily').checked,
+                    isReverse: document.getElementById('objective-is-reverse').checked,
+                    category: document.getElementById('objective-category').value,
+                    current: 0 // Par défaut, nouvel objectif commence à 0
+                };
+                
+                // Vérifier si l'utilisateur est connecté
+                const user = await getCurrentUser();
+                
+                if (!user) {
+                    throw new Error("Vous devez être connecté pour créer un objectif");
+                }
+                
+                // Afficher un indicateur de chargement
+                showLoadingIndicator();
+                
+                // Créer ou mettre à jour l'objectif
+                let newObjective;
+                
+                if (objectiveData.id) {
+                    // Mise à jour d'un objectif existant
+                    // Trouver l'objectif existant dans la liste
+                    let existingObjective = null;
+                    
+                    for (const category in objectives) {
+                        const found = objectives[category].find(obj => obj.id === objectiveData.id);
+                        if (found) {
+                            existingObjective = found;
+                            break;
+                        }
+                    }
+                    
+                    if (existingObjective) {
+                        // Mise à jour des propriétés
+                        existingObjective.title = objectiveData.title;
+                        existingObjective.target = objectiveData.target;
+                        existingObjective.unit = objectiveData.unit;
+                        existingObjective.xpPerUnit = objectiveData.xpPerUnit;
+                        existingObjective.isDaily = objectiveData.isDaily;
+                        existingObjective.isReverse = objectiveData.isReverse;
+                        
+                        // Si la catégorie a changé, déplacer l'objectif
+                        if (existingObjective.category !== objectiveData.category) {
+                            // Supprimer de l'ancienne catégorie
+                            const oldCategoryIndex = objectives[existingObjective.category].findIndex(obj => obj.id === objectiveData.id);
+                            if (oldCategoryIndex !== -1) {
+                                objectives[existingObjective.category].splice(oldCategoryIndex, 1);
+                            }
+                            
+                            // Ajouter à la nouvelle catégorie
+                            existingObjective.category = objectiveData.category;
+                            objectives[objectiveData.category].push(existingObjective);
+                        }
+                        
+                        newObjective = existingObjective;
+                    } else {
+                        throw new Error("Objectif non trouvé");
+                    }
+                } else {
+                    // Création d'un nouvel objectif
+                    newObjective = await createNewObjective(user.id, objectiveData);
+                    
+                    // Ajouter l'objectif à la liste locale
+                    if (!objectives[objectiveData.category]) {
+                        objectives[objectiveData.category] = [];
+                    }
+                    objectives[objectiveData.category].push(newObjective);
+                }
+                
+                // Sauvegarder l'état de l'application
+                await saveUserProgress(user.id, null, null, appState, objectives);
+                
+                // Fermer la modale
+                document.getElementById('objective-modal').style.display = 'none';
+                
+                // Mettre à jour l'affichage
+                renderObjectivesTab();
+                
+                // Afficher un message de succès
+                const notification = document.createElement('div');
+                notification.className = 'notification success';
+                notification.innerHTML = `<p>Objectif ${newObjective.title} ${objectiveData.id ? 'mis à jour' : 'créé'} avec succès !</p>`;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 3000);
+                
+            } catch (error) {
+                console.error("Erreur lors de la création/mise à jour de l'objectif:", error);
+                
+                // Afficher un message d'erreur
+                const errorElement = document.createElement('div');
+                errorElement.className = 'error-message';
+                errorElement.textContent = `Erreur: ${error.message || "Une erreur est survenue lors de la sauvegarde de l'objectif"}`;
+                
+                // Insérer avant le bouton de sauvegarde
+                const formActions = objectiveForm.querySelector('.form-actions');
+                objectiveForm.insertBefore(errorElement, formActions);
+                
+                // Supprimer après 5 secondes
+                setTimeout(() => {
+                    errorElement.remove();
+                }, 5000);
+            } finally {
+                hideLoadingIndicator();
+            }
+        });
+    }
+    
+    // Configuration du bouton de suppression
+    const deleteObjectiveBtn = document.getElementById('delete-objective-btn');
+    if (deleteObjectiveBtn) {
+        deleteObjectiveBtn.addEventListener('click', async () => {
+            try {
+                const objectiveId = document.getElementById('objective-id').value;
+                if (!objectiveId) {
+                    throw new Error("ID d'objectif non valide");
+                }
+                
+                // Confirmation de suppression
+                if (!confirm("Êtes-vous sûr de vouloir supprimer cet objectif ? Cette action est irréversible.")) {
+                    return;
+                }
+                
+                const user = await getCurrentUser();
+                if (!user) {
+                    throw new Error("Utilisateur non connecté");
+                }
+                
+                showLoadingIndicator();
+                
+                // Supprimer l'objectif dans Supabase
+                await deleteObjective(user.id, objectiveId);
+                
+                // Supprimer l'objectif localement
+                for (const category in objectives) {
+                    const index = objectives[category].findIndex(obj => obj.id === objectiveId);
+                    if (index !== -1) {
+                        objectives[category].splice(index, 1);
+                        break;
+                    }
+                }
+                
+                // Fermer la modale
+                document.getElementById('objective-modal').style.display = 'none';
+                
+                // Mettre à jour l'affichage
+                renderObjectivesTab();
+                
+                // Afficher un message de succès
+                const notification = document.createElement('div');
+                notification.className = 'notification success';
+                notification.innerHTML = `<p>Objectif supprimé avec succès</p>`;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 3000);
+                
+            } catch (error) {
+                console.error("Erreur lors de la suppression de l'objectif:", error);
+                alert(`Erreur: ${error.message || "Une erreur est survenue lors de la suppression de l'objectif"}`);
+            } finally {
+                hideLoadingIndicator();
+            }
+        });
+    }
+}
+
+// Fonction pour afficher les objectifs dans l'onglet Objectifs (style Trello)
+function renderObjectivesTab() {
+    console.log("Rendu de l'onglet Objectifs");
+    
+    // Récupérer le conteneur des objectifs
+    const objectivesList = document.getElementById('objectives-list');
+    if (!objectivesList) {
+        console.error("Conteneur des objectifs non trouvé");
+        return;
+    }
+    
+    // Vider le conteneur
+    objectivesList.innerHTML = '';
+    
+    // Récupérer la catégorie active
+    const activeCategory = document.querySelector('#objectives-tab .category-btn.active');
+    const category = activeCategory ? activeCategory.getAttribute('data-category') : 'personal';
+    
+    // Vérifier si la catégorie existe
+    if (!objectives[category] || !Array.isArray(objectives[category])) {
+        console.error(`Catégorie d'objectifs non valide: ${category}`);
+        objectivesList.innerHTML = '<p class="error-message">Catégorie non valide ou vide</p>';
+        return;
+    }
+    
+    // Afficher chaque objectif
+    if (objectives[category].length === 0) {
+        objectivesList.innerHTML = '<p class="empty-state">Aucun objectif dans cette catégorie. Cliquez sur "Ajouter un objectif" pour commencer.</p>';
+    } else {
+        objectives[category].forEach(objective => {
+            // Calculer le pourcentage de progression
+            let progressPercent = 0;
+            if (objective.current >= objective.target) {
+                progressPercent = 100;
+            } else {
+                progressPercent = Math.round((objective.current / objective.target) * 100);
+            }
+            
+            // Créer la carte d'objectif
+            const objectiveCard = document.createElement('div');
+            objectiveCard.className = 'objective-card';
+            objectiveCard.setAttribute('data-id', objective.id);
+            
+            // Créer les tags
+            let tags = '';
+            if (objective.isDaily) {
+                tags += '<span class="objective-tag daily">Quotidien</span>';
+            }
+            if (objective.isReverse) {
+                tags += '<span class="objective-tag reverse">Inversé</span>';
+            }
+            
+            // Contenu de la carte
+            objectiveCard.innerHTML = `
+                <div class="card-title">${objective.title} ${tags}</div>
+                <div class="card-details">
+                    <span class="card-progress-text">${objective.current}/${objective.target} ${objective.unit}</span>
+                    <span class="card-xp">${objective.xpPerUnit} XP/unité</span>
+                </div>
+                <div class="card-progress">
+                    <div class="progress-value" style="width: ${progressPercent}%; background-color: ${getProgressColor(progressPercent, objective.isReverse)};"></div>
+                </div>
+            `;
+            
+            // Ajouter un gestionnaire d'événement pour ouvrir la modale d'édition
+            objectiveCard.addEventListener('click', () => {
+                // Remplir le formulaire avec les données de l'objectif
+                document.getElementById('objective-title').value = objective.title;
+                document.getElementById('objective-target').value = objective.target;
+                document.getElementById('objective-unit').value = objective.unit;
+                document.getElementById('objective-xp').value = objective.xpPerUnit;
+                document.getElementById('objective-is-daily').checked = objective.isDaily;
+                document.getElementById('objective-is-reverse').checked = objective.isReverse;
+                document.getElementById('objective-category').value = category;
+                document.getElementById('objective-id').value = objective.id;
+                
+                // Afficher le bouton de suppression
+                document.getElementById('delete-objective-btn').style.display = 'block';
+                
+                // Afficher la modale
+                document.getElementById('objective-modal-title').textContent = 'Modifier l\'Objectif';
+                document.getElementById('objective-modal').style.display = 'flex';
+            });
+            
+            objectivesList.appendChild(objectiveCard);
+        });
+    }
+    
+    console.log(`${objectives[category].length} objectifs affichés`);
+} 

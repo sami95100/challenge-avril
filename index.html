@@ -75,6 +75,7 @@
         <div class="tab-navigation">
             <button id="tab-daily" class="tab-btn active">Aujourd'hui</button>
             <button id="tab-progress" class="tab-btn">Progression</button>
+            <button id="tab-objectives" class="tab-btn">Objectifs</button>
             <button id="tab-stats" class="tab-btn">Stats</button>
         </div>
 
@@ -91,6 +92,70 @@
                     <button data-category="professional" class="category-btn" id="category-btn-professional">Pro</button>
                 </div>
                 <div id="progress-container" class="content-section"></div>
+            </div>
+            
+            <div id="objectives-tab" class="tab-content">
+                <h2>Gestion des Objectifs</h2>
+                <div class="category-selector">
+                    <button data-category="personal" class="category-btn active" id="objectives-category-btn-personal">Perso</button>
+                    <button data-category="professional" class="category-btn" id="objectives-category-btn-professional">Pro</button>
+                </div>
+                
+                <div class="objectives-trello-board">
+                    <div class="board-column" id="objectives-container">
+                        <div class="column-header">
+                            <h3>Mes Objectifs</h3>
+                        </div>
+                        <div class="column-content" id="objectives-list">
+                            <!-- Les objectifs seront ajoutés ici dynamiquement -->
+                        </div>
+                        <button id="add-objective-btn" class="add-card-btn">+ Ajouter un objectif</button>
+                    </div>
+                </div>
+                
+                <!-- Modal pour ajouter/éditer un objectif -->
+                <div id="objective-modal" class="modal">
+                    <div class="modal-content">
+                        <span class="close-modal">&times;</span>
+                        <h3 id="objective-modal-title">Nouvel Objectif</h3>
+                        <form id="objective-form">
+                            <div class="form-group">
+                                <label for="objective-title">Titre</label>
+                                <input type="text" id="objective-title" placeholder="Ex: Courir" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="objective-target">Valeur cible</label>
+                                <input type="number" id="objective-target" placeholder="Ex: 150" required min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="objective-unit">Unité</label>
+                                <input type="text" id="objective-unit" placeholder="Ex: km" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="objective-xp">XP par unité</label>
+                                <input type="number" id="objective-xp" placeholder="Ex: 10" required min="1" value="5">
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="objective-is-daily">
+                                    Objectif quotidien (non cumulatif)
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="objective-is-reverse">
+                                    Objectif inversé (moins c'est mieux)
+                                </label>
+                            </div>
+                            <input type="hidden" id="objective-category" value="personal">
+                            <input type="hidden" id="objective-id" value="">
+                            <div class="form-actions">
+                                <button type="submit" class="save-btn">Enregistrer</button>
+                                <button type="button" class="delete-btn" id="delete-objective-btn" style="display: none;">Supprimer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             <div id="stats-tab" class="tab-content">

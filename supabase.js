@@ -406,10 +406,25 @@ export async function saveUserProgress(userId, dateStr, dateData, appState, obje
     // Mettre à jour les objectifs
     for (const category in objectives) {
       for (const objective of objectives[category]) {
-        await supabase
+        // Vérifier si l'objectif existe déjà dans la base de données
+        const { data: existingObjective } = await supabase
           .from('objectives')
-          .update({ current_value: objective.current })
-          .eq('id', objective.id);
+          .select('id')
+          .eq('user_id', userId)
+          .eq('internal_id', objective.id)
+          .maybeSingle();
+
+        if (existingObjective) {
+          // Mettre à jour l'objectif existant
+          await supabase
+            .from('objectives')
+            .update({ current_value: objective.current })
+            .eq('id', existingObjective.id);
+        } else {
+          // L'objectif n'existe pas encore dans la base de données, on le crée
+          console.log("Objectif non trouvé dans la base de données, création impossible:", objective.id);
+          // Note: les objectifs doivent être créés via createNewObjective, pas ici
+        }
       }
     }
     
@@ -425,6 +440,90 @@ export async function saveUserProgress(userId, dateStr, dateData, appState, obje
     return true;
   } catch (error) {
     console.error("Erreur lors de la sauvegarde des données:", error);
-    return false;
+    throw error;
+  }
+}
+
+// Fonction pour créer un nouvel objectif personnalisé
+export async function createNewObjective(userId, objectiveData) {
+  try {
+    console.log("Création d'un nouvel objectif:", objectiveData);
+    
+    if (!userId) {
+      throw new Error("Utilisateur non connecté");
+    }
+    
+    // Générer un ID interne unique
+    const internalId = objectiveData.id || `${objectiveData.category}-${Date.now()}`;
+    
+    // Préparer les données de l'objectif
+    const newObjective = {
+      user_id: userId,
+      internal_id: internalId,
+      category: objectiveData.category,
+      title: objectiveData.title,
+      target_value: objectiveData.target,
+      current_value: objectiveData.current || 0,
+      unit: objectiveData.unit,
+      xp_per_unit: objectiveData.xpPerUnit || 5,
+      is_daily: objectiveData.isDaily || false,
+      is_reverse: objectiveData.isReverse || false,
+      created_at: new Date().toISOString()
+    };
+    
+    // Insérer l'objectif dans la base de données
+    const { data, error } = await supabase
+      .from('objectives')
+      .insert([newObjective])
+      .select();
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log("Nouvel objectif créé avec succès:", data[0]);
+    
+    // Retourner l'objectif formaté pour l'application
+    return {
+      id: internalId,
+      title: objectiveData.title,
+      target: objectiveData.target,
+      current: objectiveData.current || 0,
+      unit: objectiveData.unit,
+      xpPerUnit: objectiveData.xpPerUnit || 5,
+      isDaily: objectiveData.isDaily || false,
+      isReverse: objectiveData.isReverse || false
+    };
+    
+  } catch (error) {
+    console.error("Erreur lors de la création d'un nouvel objectif:", error);
+    throw error;
+  }
+}
+
+// Fonction pour supprimer un objectif existant
+export async function deleteObjective(userId, objectiveId) {
+  try {
+    if (!userId || !objectiveId) {
+      throw new Error("Utilisateur ou objectif non spécifié");
+    }
+    
+    // Supprimer l'objectif
+    const { error } = await supabase
+      .from('objectives')
+      .delete()
+      .eq('user_id', userId)
+      .eq('internal_id', objectiveId);
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log("Objectif supprimé avec succès:", objectiveId);
+    return true;
+    
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'objectif:", error);
+    throw error;
   }
 } 
